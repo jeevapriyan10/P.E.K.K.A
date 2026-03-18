@@ -56,7 +56,7 @@ export default function MacroPieChart({
   return (
     <View style={[{ width: size, height: size }, styles.container]}>
       <Svg width={size} height={size}>
-        {renderRing(protein, proteinGoal, r1, Colors.dark.violet)}
+        {renderRing(protein, proteinGoal, r1, Colors.dark.cyan)}
         {renderRing(carbs, carbsGoal, r2, Colors.dark.lime)}
         {renderRing(fat, fatGoal, r3, Colors.dark.rose)}
       </Svg>

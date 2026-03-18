@@ -45,7 +45,11 @@ export default function Feed() {
       contentContainerStyle={styles.storiesContent}
     >
       {stories.map((s, i) => (
-        <TouchableOpacity key={s.id || i} style={styles.storyItem}>
+        <TouchableOpacity 
+          key={s.id || i} 
+          style={styles.storyItem}
+          onPress={() => s.id === 'me' ? router.push('/social/create-story' as any) : router.push({ pathname: '/social/story/[id]', params: { id: s.id } } as any)}
+        >
           <View style={[styles.storyRing, !s.isSeen && { borderColor: Colors.dark.lime }]}>
             <Avatar source={s.avatar} size={64} />
             {s.id === 'me' && (

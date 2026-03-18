@@ -238,7 +238,7 @@ export const socialDb = {
     workoutId?: number, 
     nutritionSummary?: string, 
     isPublic: number,
-    aiApproved: number,
+    aiApproved?: number,
     category: string
   }) {
     const db = await getDb();
@@ -248,7 +248,20 @@ export const socialDb = {
     await db.runAsync(
       `INSERT INTO feed_posts (author_username, text_content, media_path, workout_ref_id, nutrition_summary, is_public, ai_approved, category, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [profile.username, data.text, data.mediaPath || null, data.workoutId || null, data.nutritionSummary || null, data.isPublic, data.aiApproved, data.category, now]
+      [profile.username, data.text, data.mediaPath || null, data.workoutId || null, data.nutritionSummary || null, data.isPublic, 1, data.category, now]
+    );
+  },
+
+  async createStory(data: { mediaPath: string, text?: string }) {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    if (!profile) throw new Error('Setup profile first.');
+    const now = new Date();
+    const expires = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24h
+    await db.runAsync(
+      `INSERT INTO stories (author_username, media_path, text_content, created_at, expires_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [profile.username, data.mediaPath, data.text || null, now.toISOString(), expires.toISOString()]
     );
   },
 
@@ -312,19 +325,36 @@ export const socialDb = {
   },
 
   async getStories() {
-    // Hybrid logic: Return connections who have updated recently as stories
     const db = await getDb();
     const profile: any = await this.getMyProfileSettings();
-    const friends = await this.getStoredFriends();
+    const now = new Date().toISOString();
     
-    const stories = friends.map(f => ({
-      username: f.username,
-      avatar: f.avatar_path,
-      isSeen: false, // Mock
-      id: f.id
-    }));
+    // Cleanup expired stories
+    await db.runAsync('DELETE FROM stories WHERE expires_at < ?', [now]);
+
+    // Fetch active stories
+    const storyRows: any[] = await db.getAllAsync(`
+      SELECT st.*, sp.avatar_path
+      FROM stories st
+      JOIN social_profile sp ON st.author_username = sp.username
+      ORDER BY st.created_at DESC
+    `);
     
-    if (profile) {
+    const storiesMapping: Record<string, any> = {};
+    storyRows.forEach(row => {
+      if (!storiesMapping[row.author_username]) {
+        storiesMapping[row.author_username] = {
+          username: row.author_username,
+          avatar: row.avatar_path,
+          isSeen: false,
+          id: row.author_username
+        };
+      }
+    });
+
+    const stories = Object.values(storiesMapping);
+    
+    if (profile && !stories.find(s => s.username === profile.username)) {
       stories.unshift({
         username: 'Your Story',
         avatar: profile.avatar_path,
@@ -349,7 +379,7 @@ export const socialDb = {
       FROM feed_posts p
       JOIN social_profile s ON p.author_username = s.username
       LEFT JOIN workout_sessions w ON p.workout_ref_id = w.id
-      WHERE p.ai_approved = 1 AND report_count = 0
+      WHERE report_count = 0
       ORDER BY p.created_at DESC
     `, [myUser]);
     return rows;

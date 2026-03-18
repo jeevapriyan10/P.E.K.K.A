@@ -141,7 +141,7 @@ export default function Dashboard() {
             <Text style={styles.date}>{getFormattedDate()}</Text>
           </View>
           <TouchableOpacity onPress={() => router.push('/settings')}>
-            <Avatar source={avatar || ''} size={40} />
+            <Avatar source={avatar ? (avatar.includes('/') ? `${avatar}?t=${Date.now()}` : avatar) : ''} size={40} />
           </TouchableOpacity>
         </View>
 

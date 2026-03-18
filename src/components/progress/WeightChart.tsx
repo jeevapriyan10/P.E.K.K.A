@@ -65,19 +65,34 @@ export default function WeightChart({ data, goalWeight, compact = false }: Props
         areaChart
         curved
         data={points}
+        dataSet={[
+           {
+             data: points,
+             color: Colors.dark.dim,
+             thickness: 1,
+             startFillColor: Colors.dark.dim,
+             startOpacity: 0.1,
+             hideDataPoints: false,
+             dataPointsColor: Colors.dark.dim,
+             dataPointsRadius: 2,
+           },
+           {
+             data: trendLineData || [],
+             color: Colors.dark.lime,
+             thickness: 4,
+             startFillColor: Colors.dark.lime,
+             startOpacity: 0.2,
+             endOpacity: 0.01,
+             hideDataPoints: true,
+           }
+        ]}
         hideDataPoints={compact}
         spacing={compact ? 30 : 60}
         initialSpacing={20}
-        color={Colors.dark.cyan}
-        thickness={3}
-        startFillColor={Colors.dark.cyan}
-        endFillColor={Colors.dark.cyan}
-        startOpacity={0.2}
-        endOpacity={0.01}
         yAxisColor="transparent"
         xAxisColor="transparent"
         rulesType="dashed"
-        rulesColor="#333"
+        rulesColor="#222"
         dashWidth={4}
         dashGap={4}
         yAxisTextStyle={styles.axisText}
@@ -86,13 +101,13 @@ export default function WeightChart({ data, goalWeight, compact = false }: Props
         noOfSections={4}
         height={compact ? 120 : 200}
         pointerConfig={{
-          pointerStripColor: Colors.dark.cyan,
+          pointerStripColor: Colors.dark.lime,
           pointerStripWidth: 2,
-          pointerColor: Colors.dark.cyan,
-          radius: 4,
+          pointerColor: Colors.dark.lime,
+          radius: 6,
           pointerLabelComponent: (items: any) => (
             <View style={styles.tooltip}>
-              <Text style={styles.tooltipText}>{items[0].value} kg</Text>
+              <Text style={styles.tooltipText}>{items[1]?.value ? items[1].value.toFixed(1) : items[0].value} kg</Text>
             </View>
           ),
         }}

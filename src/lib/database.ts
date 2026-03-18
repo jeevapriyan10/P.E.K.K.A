@@ -266,6 +266,15 @@ export async function initializeDatabase(db: SQLite.SQLiteDatabase) {
         synced_at TEXT,
         created_at TEXT
       );
+
+      CREATE TABLE IF NOT EXISTS stories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        author_username TEXT,
+        media_path TEXT,
+        text_content TEXT,
+        created_at TEXT,
+        expires_at TEXT
+      );
     `);
     
     // Developer Hotfixes for missing columns in existing DB

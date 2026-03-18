@@ -1,23 +1,31 @@
-// filepath: src/services/notificationService.ts
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
-// Notification handler (when app is in foreground)
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+let Notifications: any = null;
+try {
+  // Only import on real devices/dev builds to avoid Expo Go SDK 53+ push registration error
+  if (Constants.appOwnership !== 'expo') {
+    Notifications = require('expo-notifications');
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  }
+} catch (e) {
+  console.warn("Notifications failed to initialize", e);
+}
 
 const PERMISSION_KEY = 'notification_permission_granted';
 
 export const notificationService = {
   async initNotificationChannel() {
+    if (!Notifications) return;
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('pekka_main', {
         name: 'P.E.K.K.A Reminders',
@@ -31,6 +39,7 @@ export const notificationService = {
   },
 
   async requestPermissions() {
+    if (!Notifications) return false;
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
     if (existingStatus !== 'granted') {
@@ -53,6 +62,7 @@ export const notificationService = {
   },
 
   async scheduleMealReminder(mealType: string, time: Date) {
+    if (!Notifications) return;
     await Notifications.scheduleNotificationAsync({
       content: {
         title: `Time for ${mealType}!`,
@@ -70,6 +80,7 @@ export const notificationService = {
   },
 
   async scheduleWorkoutReminder(time: Date) {
+    if (!Notifications) return;
     await Notifications.scheduleNotificationAsync({
       content: {
         title: "Time to crush it!",
@@ -86,6 +97,7 @@ export const notificationService = {
   },
 
   async scheduleWaterReminder() {
+    if (!Notifications) return;
     // Every 2.5 hours between 8am-9pm
     const times = [
       { h: 8, m: 0 },
@@ -113,6 +125,7 @@ export const notificationService = {
   },
 
   async scheduleWeeklyReport() {
+    if (!Notifications) return;
     await Notifications.scheduleNotificationAsync({
       content: {
         title: "Your Weekly Fitness Report is Ready!",
@@ -129,6 +142,7 @@ export const notificationService = {
   },
 
   async sendAchievementNotification(name: string) {
+     if (!Notifications) return;
      await Notifications.scheduleNotificationAsync({
       content: {
         title: "Achievement Unlocked!",
@@ -139,6 +153,7 @@ export const notificationService = {
   },
 
   async cancelAllNotifications() {
+    if (!Notifications) return;
     await Notifications.cancelAllScheduledNotificationsAsync();
   }
 };

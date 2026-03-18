@@ -6,7 +6,6 @@ import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
-import { contentModerationService } from '../../src/services/contentModerationService';
 import { socialDb } from '../../src/db/socialDb';
 import { Colors } from '../../src/constants/colors';
 
@@ -60,11 +59,6 @@ export default function CreatePost() {
     }
     setIsPosting(true);
     try {
-      const moderation = await contentModerationService.moderatePost({ text, hasImage: !!image });
-      if (!moderation.approved) {
-        setIsPosting(false);
-        return Alert.alert("Rejected", moderation.reason);
-      }
 
       let finalImagePath = null;
       if (image) {
@@ -92,7 +86,7 @@ export default function CreatePost() {
         mediaPath: finalImagePath || undefined,
         isPublic: visibility,
         aiApproved: 1,
-        category: attachment || moderation.category,
+        category: attachment || "photo",
         workoutId: selectedWorkout?.id,
         nutritionSummary: nutSummary
       });
