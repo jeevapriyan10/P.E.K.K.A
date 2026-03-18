@@ -8,49 +8,62 @@ interface Props {
   protein: number;
   carbs: number;
   fat: number;
+  proteinGoal?: number;
+  carbsGoal?: number;
+  fatGoal?: number;
   size?: number;
-  strokeWidth?: number;
 }
 
-export default function MacroPieChart({ protein, carbs, fat, size = 120, strokeWidth = 14 }: Props) {
-  const sum = protein + carbs + fat;
-  const total = sum === 0 ? 1 : sum;
+export default function MacroPieChart({ 
+  protein, carbs, fat, 
+  proteinGoal = 150, carbsGoal = 200, fatGoal = 60,
+  size = 140 
+}: Props) {
   
-  const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
+  const strokeWidth = 12;
+  const gap = 4;
+  
+  const renderRing = (val: number, goal: number, radius: number, color: string) => {
+    const circumference = radius * 2 * Math.PI;
+    const pct = Math.min(1, val / Math.max(1, goal));
+    const offset = circumference - (pct * circumference);
+    
+    return (
+      <G rotation="-90" origin={`${size/2}, ${size/2}`}>
+        {/* Track */}
+        <Circle 
+          cx={size/2} cy={size/2} r={radius} 
+          stroke="#1A1A1A" strokeWidth={strokeWidth} 
+          fill="none" 
+        />
+        {/* Fill */}
+        <Circle 
+          cx={size/2} cy={size/2} r={radius} 
+          stroke={color} strokeWidth={strokeWidth} 
+          fill="none" 
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+        />
+      </G>
+    );
+  };
 
-  const proteinPct = protein / total;
-  const carbsPct = carbs / total;
-  const fatPct = fat / total;
-
-  const proteinDash = circumference * proteinPct;
-  const carbsDash = circumference * carbsPct;
-  const fatDash = circumference * fatPct;
-
-  const carbsOffset = circumference - proteinDash;
-  const fatOffset = carbsOffset - carbsDash;
+  const r1 = (size / 2) - (strokeWidth / 2);
+  const r2 = r1 - strokeWidth - gap;
+  const r3 = r2 - strokeWidth - gap;
 
   return (
     <View style={[{ width: size, height: size }, styles.container]}>
       <Svg width={size} height={size}>
-        <G rotation="-90" origin={`${size/2}, ${size/2}`}>
-          {/* Base track */}
-          <Circle cx={size/2} cy={size/2} r={radius} stroke={Colors.dark.bg4} strokeWidth={strokeWidth} fill="none" />
-          
-          {/* Protein */}
-          {protein > 0 && <Circle cx={size/2} cy={size/2} r={radius} stroke={Colors.dark.violet} strokeWidth={strokeWidth} fill="none" strokeDasharray={`${proteinDash} ${circumference}`} />}
-
-          {/* Carbs */}
-          {carbs > 0 && <Circle cx={size/2} cy={size/2} r={radius} stroke={Colors.dark.lime} strokeWidth={strokeWidth} fill="none" strokeDasharray={`${carbsDash} ${circumference}`} strokeDashoffset={carbsOffset} />}
-
-          {/* Fat */}
-          {fat > 0 && <Circle cx={size/2} cy={size/2} r={radius} stroke={Colors.dark.rose} strokeWidth={strokeWidth} fill="none" strokeDasharray={`${fatDash} ${circumference}`} strokeDashoffset={fatOffset} />}
-        </G>
+        {renderRing(protein, proteinGoal, r1, Colors.dark.violet)}
+        {renderRing(carbs, carbsGoal, r2, Colors.dark.lime)}
+        {renderRing(fat, fatGoal, r3, Colors.dark.rose)}
       </Svg>
       <View style={StyleSheet.absoluteFillObject}>
         <View style={styles.center}>
-          <Text style={styles.centerText}>{Math.round(sum)}g</Text>
-          <Text style={styles.subtext}>Total Macros</Text>
+          <Text style={styles.centerText}>{Math.round(protein+carbs+fat)}g</Text>
+          <Text style={styles.subtext}>Total</Text>
         </View>
       </View>
     </View>
@@ -60,6 +73,6 @@ export default function MacroPieChart({ protein, carbs, fat, size = 120, strokeW
 const styles = StyleSheet.create({
   container: { alignItems: 'center', justifyContent: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  centerText: { fontSize: 18, color: Colors.dark.text, fontWeight: 'bold' },
-  subtext: { fontSize: 10, color: Colors.dark.muted }
+  centerText: { fontSize: 18, color: '#FFF', fontWeight: '800' },
+  subtext: { fontSize: 10, color: '#555', marginTop: 1, textTransform: 'uppercase' }
 });

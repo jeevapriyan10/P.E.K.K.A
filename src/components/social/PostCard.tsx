@@ -1,26 +1,61 @@
 // filepath: src/components/social/PostCard.tsx
 import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, Share } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, Share, TextInput } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
+import { Avatar } from '../ui/Avatar';
+import { socialDb } from '../../db/socialDb';
 
 interface PostCardProps {
   post: any;
-  onLike?: (postId: number, increment: boolean) => void;
   onReport?: (postId: number) => void;
 }
 
-import { Avatar } from '../ui/Avatar';
-
-export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onReport }) => {
-  const [isLiked, setIsLiked] = useState(false);
+export const PostCard: React.FC<PostCardProps & { onRefresh?: () => void }> = ({ post, onReport, onRefresh }) => {
+  const [isLiked, setIsLiked] = useState(post.is_liked === 1);
   const [likes, setLikes] = useState(post.likes_count || 0);
+  const [showComments, setShowComments] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [comments, setComments] = useState<any[]>([]);
+  const [commentsCount, setCommentsCount] = useState(post.comments_count || 0);
 
-  const handleLike = () => {
+  const handleLike = async () => {
     const nextState = !isLiked;
     setIsLiked(nextState);
     setLikes((prev: number) => nextState ? prev + 1 : prev - 1);
-    onLike?.(post.id, nextState);
+    await socialDb.toggleLike(post.id);
+  };
+
+  const loadComments = async () => {
+    const data = await socialDb.getComments(post.id);
+    setComments(data);
+    setCommentsCount(data.length);
+  };
+
+  const toggleComments = () => {
+    if (!showComments) loadComments();
+    setShowComments(!showComments);
+  };
+
+  const handleAddComment = async () => {
+    if (!commentText.trim()) return;
+    try {
+      await socialDb.addComment(post.id, commentText);
+      setCommentText('');
+      loadComments();
+    } catch (e) {
+      Alert.alert("Error", "Failed to add comment.");
+    }
+  };
+
+  const handleDelete = () => {
+    Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => {
+        await socialDb.deletePost(post.id);
+        onRefresh?.();
+      }}
+    ]);
   };
 
   const handleShare = async () => {
@@ -33,13 +68,16 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onReport }) =>
     }
   };
 
-  const handleMore = () => {
+  const handleMore = async () => {
+    const me: any = await socialDb.getMyProfileSettings();
+    const isMe = me?.username === post.author_username;
+
     Alert.alert(
       "Options",
       "What would you like to do?",
       [
         { text: "Report / Hide", style: "destructive", onPress: () => onReport?.(post.id) },
-        { text: "Copy Text", onPress: () => {} }, // Clipboard not requested specifically but good placeholder
+        ...(isMe ? [{ text: "Delete Post", style: "destructive" as any, onPress: handleDelete }] : []),
         { text: "Cancel", style: "cancel" }
       ]
     );
@@ -50,114 +88,166 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onReport }) =>
     const past = new Date(dateStr);
     const diffMs = now.getTime() - past.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffMins < 60) return `${diffMins}m`;
     const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffHours < 24) return `${diffHours}h`;
     return past.toLocaleDateString();
+  };
+
+  const getCategoryColor = () => {
+    if (post.category === 'workout') return Colors.dark.lime;
+    if (post.category === 'nutrition') return Colors.dark.cyan;
+    return Colors.dark.muted;
   };
 
   return (
     <View style={styles.card}>
-      {/* Author Row */}
+      {/* Header */}
       <View style={styles.authorRow}>
-        <Avatar source={post.avatar_path} size={40} />
-        <View style={[styles.authorInfo, { marginLeft: 12 }]}>
-          <Text style={styles.displayName}>{post.display_name || post.author_username}</Text>
-          <Text style={styles.username}>@{post.author_username} • {getTimeAgo(post.created_at)}</Text>
+        <Avatar source={post.avatar_path} size={36} />
+        <View style={styles.authorInfo}>
+          <Text style={styles.displayName}>{post.author_username}</Text>
+          <Text style={styles.username}>{getTimeAgo(post.created_at)}</Text>
         </View>
         <TouchableOpacity style={styles.moreBtn} onPress={handleMore}>
-          <MaterialCommunityIcons name="dots-horizontal" size={20} color="#555" />
+          <MaterialCommunityIcons name="dots-horizontal" size={20} color="#666" />
         </TouchableOpacity>
       </View>
 
-      {/* Category Badge */}
-      <View style={styles.badgeRow}>
-        <View style={[styles.categoryBadge, { backgroundColor: Colors.dark.lime + '20' }]}>
-          <Text style={styles.categoryText}>{post.category || 'workout'}</Text>
-        </View>
+      {/* Media or Placeholder */}
+      <View style={styles.mediaContainer}>
+        {post.media_path ? (
+          <Image source={{ uri: post.media_path }} style={styles.media} resizeMode="cover" />
+        ) : (
+          <View style={styles.textOnlyMedia}>
+             <MaterialCommunityIcons name="format-quote-open" size={40} color="#222" />
+          </View>
+        )}
+        {post.category && (
+          <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor() + '20', borderColor: getCategoryColor() }]}>
+             <Text style={[styles.categoryText, { color: getCategoryColor() }]}>{post.category.toUpperCase()}</Text>
+          </View>
+        )}
       </View>
 
-      {/* Text Content */}
-      <Text style={styles.textContent}>{post.text_content}</Text>
+      {/* Actions */}
+      <View style={styles.actionRow}>
+        <View style={styles.actionGroup}>
+          <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
+            <MaterialCommunityIcons 
+              name={isLiked ? "heart" : "heart-outline"} 
+              size={26} 
+              color={isLiked ? "#FF3B30" : "#FFF"} 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn} onPress={toggleComments}>
+            <MaterialCommunityIcons name="chat-outline" size={26} color="#FFF" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
+            <MaterialCommunityIcons name="send-outline" size={24} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity style={styles.actionBtn}>
+          <MaterialCommunityIcons name="bookmark-outline" size={26} color="#FFF" />
+        </TouchableOpacity>
+      </View>
 
-      {/* Media */}
-      {post.media_path && (
-        <Image 
-          source={{ uri: post.media_path }} 
-          style={styles.media} 
-          resizeMode="cover" 
-        />
-      )}
+      {/* Caption Content */}
+      <View style={styles.captionRow}>
+        <Text style={styles.likesText}>{likes.toLocaleString()} likes</Text>
+        {post.text_content ? (
+          <Text style={styles.captionText}>
+            <Text style={styles.captionUser}>{post.author_username}</Text> {post.text_content}
+          </Text>
+        ) : null}
+      </View>
 
-      {/* Attachments (Workout/Nutrition) */}
+      {/* Attachments */}
       {post.workout_ref_id && (
         <View style={styles.attachmentCard}>
           <View style={styles.attachmentIcon}>
-            <MaterialCommunityIcons name="arm-flex" size={24} color={Colors.dark.lime} />
+            <MaterialCommunityIcons name="arm-flex" size={22} color={Colors.dark.lime} />
           </View>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.attachmentTitle}>{post.workout_name || 'Workout Session'}</Text>
             <Text style={styles.attachmentSub}>
-              {post.duration_minutes} min • {Math.floor(post.total_volume || 0)}kg total volume
+              {post.duration_minutes} min • {Math.floor(post.total_volume || 0)}kg volume
             </Text>
           </View>
         </View>
       )}
 
       {post.nutrition_summary && (
-        <View style={[styles.attachmentCard, { borderColor: Colors.dark.cyan + '40' }]}>
-          <View style={[styles.attachmentIcon, { backgroundColor: Colors.dark.cyan + '20' }]}>
-            <MaterialCommunityIcons name="food-apple" size={24} color={Colors.dark.cyan} />
+        <View style={[styles.attachmentCard, { borderColor: Colors.dark.cyan + '30' }]}>
+          <View style={[styles.attachmentIcon, { backgroundColor: Colors.dark.cyan + '15' }]}>
+            <MaterialCommunityIcons name="food-apple" size={22} color={Colors.dark.cyan} />
           </View>
-          <View>
-            <Text style={styles.attachmentTitle}>Nutrition Summary Update</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.attachmentTitle}>Daily Nutrition</Text>
             <Text style={styles.attachmentSub}>{post.nutrition_summary}</Text>
           </View>
         </View>
       )}
 
-      {/* Action Row */}
-      <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
-          <MaterialCommunityIcons 
-            name={isLiked ? "heart" : "heart-outline"} 
-            size={22} 
-            color={isLiked ? "#E57373" : "#777"} 
-          />
-          <Text style={[styles.actionLabel, isLiked && { color: "#E57373" }]}>{likes}</Text>
+      {/* Comments Section */}
+      {commentsCount > 0 && !showComments && (
+        <TouchableOpacity onPress={toggleComments} style={{ paddingHorizontal: 12 }}>
+          <Text style={styles.viewComments}>View all {commentsCount} comments</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionBtn}>
-          <MaterialCommunityIcons name="comment-outline" size={22} color="#777" />
-          <Text style={styles.actionLabel}>0</Text>
-        </TouchableOpacity>
+      )}
 
-        <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
-          <MaterialCommunityIcons name="export-variant" size={22} color="#777" />
-        </TouchableOpacity>
-      </View>
+      {showComments && (
+        <View style={styles.commentsList}>
+          {comments.map((c, i) => (
+            <View key={c.id || i} style={styles.commentItem}>
+               <Text style={styles.commentUser}>{c.username} <Text style={styles.commentText}>{c.text}</Text></Text>
+            </View>
+          ))}
+          <View style={styles.commentInputRow}>
+            <Avatar source={post.my_avatar_path} size={28} />
+            <TextInput 
+              style={styles.commentInput} 
+              placeholder="Add a comment..." 
+              placeholderTextColor="#555"
+              value={commentText}
+              onChangeText={setCommentText}
+              onSubmitEditing={handleAddComment}
+            />
+          </View>
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: '#111', borderRadius: 24, padding: 16, marginBottom: 16, borderBottomWidth: 1, borderBottomColor: '#222' },
-  authorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  avatar: { fontSize: 32, marginRight: 12 },
-  authorInfo: { flex: 1 },
-  displayName: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-  username: { color: '#555', fontSize: 12, marginTop: 2 },
+  card: { backgroundColor: '#000', marginBottom: 20 },
+  authorRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 },
+  authorInfo: { flex: 1, marginLeft: 10 },
+  displayName: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+  username: { color: '#888', fontSize: 11, marginTop: 1 },
   moreBtn: { padding: 4 },
-  badgeRow: { flexDirection: 'row', marginBottom: 8 },
-  categoryBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  categoryText: { color: Colors.dark.lime, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
-  textContent: { color: '#CCC', fontSize: 15, lineHeight: 22, marginBottom: 16 },
-  media: { width: '100%', height: 250, borderRadius: 16, marginBottom: 16 },
-  attachmentCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1A1A1A', padding: 12, borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.dark.lime + '40' },
-  attachmentIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.dark.lime + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  attachmentTitle: { color: '#FFF', fontSize: 14, fontWeight: 'bold' },
-  attachmentSub: { color: '#555', fontSize: 11, marginTop: 2 },
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 24, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#1A1A1A' },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  actionLabel: { color: '#777', fontSize: 14, fontWeight: '500' }
+  mediaContainer: { position: 'relative', backgroundColor: '#0A0A0A' },
+  media: { width: '100%', aspectRatio: 1, backgroundColor: '#111' },
+  textOnlyMedia: { width: '100%', height: 200, alignItems: 'center', justifyContent: 'center' },
+  categoryBadge: { position: 'absolute', top: 12, right: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1 },
+  categoryText: { fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  actionRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 12 },
+  actionGroup: { flexDirection: 'row', gap: 16, alignItems: 'center' },
+  actionBtn: { padding: 2 },
+  captionRow: { paddingHorizontal: 12, gap: 4, marginBottom: 8 },
+  likesText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+  captionText: { color: '#FFF', fontSize: 14, lineHeight: 18 },
+  captionUser: { fontWeight: '700' },
+  attachmentCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0A0A0A', margin: 12, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#1A1A1A' },
+  attachmentIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.dark.lime + '15', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  attachmentTitle: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+  attachmentSub: { color: '#888', fontSize: 12, marginTop: 2 },
+  viewComments: { color: '#555', fontSize: 13, marginTop: 4 },
+  commentsList: { paddingHorizontal: 12, marginTop: 10, gap: 8 },
+  commentItem: { flexDirection: 'row' },
+  commentUser: { color: '#FFF', fontWeight: '700', fontSize: 13 },
+  commentText: { fontWeight: '400', color: '#EEE' },
+  commentInputRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 12, gap: 12, borderTopWidth: 0.5, borderColor: '#111', paddingTop: 12 },
+  commentInput: { flex: 1, color: '#FFF', fontSize: 14, height: 36 }
 });

@@ -233,6 +233,24 @@ export async function initializeDatabase(db: SQLite.SQLiteDatabase) {
         created_at TEXT
       );
 
+      CREATE TABLE IF NOT EXISTS post_comments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        post_id INTEGER,
+        username TEXT,
+        display_name TEXT,
+        avatar TEXT,
+        text TEXT,
+        likes_count INTEGER DEFAULT 0,
+        created_at TEXT,
+        FOREIGN KEY(post_id) REFERENCES feed_posts(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS post_likes (
+        post_id INTEGER,
+        username TEXT,
+        PRIMARY KEY(post_id, username)
+      );
+
       CREATE TABLE IF NOT EXISTS reported_posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         post_id INTEGER,
@@ -259,6 +277,10 @@ export async function initializeDatabase(db: SQLite.SQLiteDatabase) {
     try { await db.execAsync('ALTER TABLE social_profile ADD COLUMN share_steps INTEGER DEFAULT 1'); } catch (e) {}
     try { await db.execAsync('ALTER TABLE social_profile ADD COLUMN share_achievements INTEGER DEFAULT 1'); } catch (e) {}
     try { await db.execAsync('ALTER TABLE feed_posts ADD COLUMN category TEXT'); } catch (e) {}
+    
+    // Engagement Hotfixes
+    try { await db.execAsync('CREATE TABLE IF NOT EXISTS post_comments (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, username TEXT, display_name TEXT, avatar TEXT, text TEXT, likes_count INTEGER DEFAULT 0, created_at TEXT)'); } catch (e) {}
+    try { await db.execAsync('CREATE TABLE IF NOT EXISTS post_likes (post_id INTEGER, username TEXT, PRIMARY KEY(post_id, username))'); } catch (e) {}
 
     console.log("Database initialized successfully");
   } catch (error) {

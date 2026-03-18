@@ -1,6 +1,6 @@
-// filepath: src/components/nutrition/WaterTracker.tsx
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import Svg, { Circle, G } from 'react-native-svg';
 import { Colors } from '../../constants/colors';
 
 interface Props {
@@ -10,45 +10,71 @@ interface Props {
 }
 
 export default function WaterTracker({ currentMl, goalMl, onAdd }: Props) {
-  const progress = Math.min(1, currentMl / Math.max(1, goalMl)) * 100;
+  const size = 120;
+  const strokeWidth = 10;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const pct = Math.min(1, currentMl / Math.max(1, goalMl));
+  const offset = circumference - (pct * circumference);
   
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Water</Text>
-        <Text style={styles.subtitle}>{currentMl} / {goalMl} ml</Text>
-      </View>
-      
-      {/* Simple horizontal progress bar instead of Arc to save SVG complexity if not needed heavily */}
-      <View style={styles.barBg}>
-        <View style={[styles.barFill, { width: `${progress}%` }]} />
-      </View>
+      <View style={styles.contentRow}>
+        <View style={styles.ringContainer}>
+          <Svg width={size} height={size}>
+            <G rotation="-90" origin={`${size/2}, ${size/2}`}>
+              <Circle 
+                cx={size/2} cy={size/2} r={radius} 
+                stroke="#1A1A1A" strokeWidth={strokeWidth} 
+                fill="none" 
+              />
+              <Circle 
+                cx={size/2} cy={size/2} r={radius} 
+                stroke={Colors.dark.cyan} strokeWidth={strokeWidth} 
+                fill="none" 
+                strokeDasharray={circumference}
+                strokeDashoffset={offset}
+                strokeLinecap="round"
+              />
+            </G>
+          </Svg>
+          <View style={styles.centerText}>
+             <Text style={styles.mlText}>{currentMl}</Text>
+             <Text style={styles.unitText}>ml</Text>
+          </View>
+        </View>
 
-      <View style={styles.buttons}>
-        <TouchableOpacity style={styles.btn} onPress={() => onAdd(250)}>
-          <Text style={styles.btnText}>+ 250ml</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.btn} onPress={() => onAdd(500)}>
-          <Text style={styles.btnText}>+ 500ml</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.btnAlert} onPress={() => onAdd(-currentMl)}>
-          <Text style={styles.btnAlertText}>Reset</Text>
-        </TouchableOpacity>
+        <View style={styles.controls}>
+          <Text style={styles.goalText}>Goal: {goalMl}ml</Text>
+          <View style={styles.btnRow}>
+             <TouchableOpacity style={styles.btn} onPress={() => onAdd(250)}>
+               <Text style={styles.btnLabel}>+250</Text>
+             </TouchableOpacity>
+             <TouchableOpacity style={styles.btn} onPress={() => onAdd(500)}>
+               <Text style={styles.btnLabel}>+500</Text>
+             </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.resetBtn} onPress={() => onAdd(-currentMl)}>
+             <Text style={styles.resetText}>Reset Progress</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: Colors.dark.bg2, padding: 20, borderRadius: 16, borderWidth: 1, borderColor: Colors.dark.border },
-  header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  title: { color: Colors.dark.text, fontSize: 16, fontWeight: 'bold' },
-  subtitle: { color: Colors.dark.sky, fontSize: 14, fontWeight: '600' },
-  barBg: { height: 8, backgroundColor: Colors.dark.bg4, borderRadius: 4, marginBottom: 16, overflow: 'hidden' },
-  barFill: { height: '100%', backgroundColor: Colors.dark.cyan },
-  buttons: { flexDirection: 'row', gap: 12 },
-  btn: { flex: 1, backgroundColor: Colors.dark.bg3, padding: 12, borderRadius: 8, alignItems: 'center' },
-  btnText: { color: Colors.dark.sky, fontWeight: 'bold' },
-  btnAlert: { padding: 12 },
-  btnAlertText: { color: Colors.dark.muted }
+  container: { backgroundColor: Colors.dark.bg2, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: Colors.dark.border },
+  contentRow: { flexDirection: 'row', alignItems: 'center', gap: 20 },
+  ringContainer: { width: 120, height: 120, alignItems: 'center', justifyContent: 'center' },
+  centerText: { position: 'absolute', alignItems: 'center' },
+  mlText: { color: '#FFF', fontSize: 20, fontWeight: '800' },
+  unitText: { color: Colors.dark.cyan, fontSize: 12, fontWeight: 'bold' },
+  controls: { flex: 1, gap: 10 },
+  goalText: { color: '#555', fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' },
+  btnRow: { flexDirection: 'row', gap: 8 },
+  btn: { flex: 1, backgroundColor: '#1A1A1A', paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#222' },
+  btnLabel: { color: Colors.dark.cyan, fontWeight: 'bold', fontSize: 13 },
+  resetBtn: { marginTop: 4 },
+  resetText: { color: '#444', fontSize: 12, fontWeight: '500' }
 });

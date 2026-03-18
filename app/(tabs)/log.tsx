@@ -107,7 +107,14 @@ export default function NutritionDashboard() {
         
         {/* Macro Summary */}
         <View style={styles.summaryCard}>
-          <MacroPieChart protein={consumed.p} carbs={consumed.c} fat={consumed.f} />
+          <MacroPieChart 
+            protein={consumed.p} 
+            carbs={consumed.c} 
+            fat={consumed.f} 
+            proteinGoal={tdee.protein_g}
+            carbsGoal={tdee.carbs_g}
+            fatGoal={tdee.fat_g}
+          />
           <View style={styles.summaryStats}>
             <View style={styles.statRow}>
               <Text style={styles.statLabel}>Calories</Text>

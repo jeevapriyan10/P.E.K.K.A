@@ -252,22 +252,6 @@ export const socialDb = {
     );
   },
 
-  async getFeedPosts() {
-    const db = await getDb();
-    // Return posts with workout info joined if present
-    const rows: any[] = await db.getAllAsync(`
-      SELECT p.*, s.display_name, s.avatar_path,
-      w.name as workout_name, w.total_volume, w.duration_minutes,
-      (SELECT COUNT(*) FROM reported_posts r WHERE r.post_id = p.id) as report_count
-      FROM feed_posts p
-      JOIN social_profile s ON p.author_username = s.username
-      LEFT JOIN workout_sessions w ON p.workout_ref_id = w.id
-      WHERE p.ai_approved = 1 AND report_count = 0
-      ORDER BY p.created_at DESC
-    `);
-    return rows;
-  },
-
   async getRecentWorkouts() {
     const db = await getDb();
     return await db.getAllAsync('SELECT * FROM workout_sessions ORDER BY date DESC LIMIT 5');
@@ -286,9 +270,88 @@ export const socialDb = {
     await db.runAsync('INSERT INTO reported_posts (post_id, reason, reported_at) VALUES (?, ?, ?)', [postId, reason, now]);
   },
 
-  async toggleLike(postId: number, increment: boolean) {
+  async deletePost(postId: number) {
     const db = await getDb();
-    const diff = increment ? 1 : -1;
-    await db.runAsync('UPDATE feed_posts SET likes_count = MAX(0, likes_count + ?) WHERE id = ?', [diff, postId]);
-  }
+    await db.runAsync('DELETE FROM feed_posts WHERE id = ?', [postId]);
+    await db.runAsync('DELETE FROM post_comments WHERE post_id = ?', [postId]);
+    await db.runAsync('DELETE FROM post_likes WHERE post_id = ?', [postId]);
+  },
+
+  async toggleLike(postId: number) {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    if (!profile) return;
+    
+    const existing = await db.getFirstAsync('SELECT * FROM post_likes WHERE post_id = ? AND username = ?', [postId, profile.username]);
+    if (existing) {
+      await db.runAsync('DELETE FROM post_likes WHERE post_id = ? AND username = ?', [postId, profile.username]);
+      await db.runAsync('UPDATE feed_posts SET likes_count = MAX(0, likes_count - 1) WHERE id = ?', [postId]);
+      return false;
+    } else {
+      await db.runAsync('INSERT INTO post_likes (post_id, username) VALUES (?, ?)', [postId, profile.username]);
+      await db.runAsync('UPDATE feed_posts SET likes_count = likes_count + 1 WHERE id = ?', [postId]);
+      return true;
+    }
+  },
+
+  async addComment(postId: number, text: string) {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    if (!profile) throw new Error('Setup profile first.');
+    const now = new Date().toISOString();
+    await db.runAsync(
+      `INSERT INTO post_comments (post_id, username, display_name, avatar, text, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [postId, profile.username, profile.display_name, profile.avatar_path, text, now]
+    );
+  },
+
+  async getComments(postId: number) {
+    const db = await getDb();
+    return await db.getAllAsync('SELECT * FROM post_comments WHERE post_id = ? ORDER BY created_at ASC', [postId]);
+  },
+
+  async getStories() {
+    // Hybrid logic: Return connections who have updated recently as stories
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    const friends = await this.getStoredFriends();
+    
+    const stories = friends.map(f => ({
+      username: f.username,
+      avatar: f.avatar_path,
+      isSeen: false, // Mock
+      id: f.id
+    }));
+    
+    if (profile) {
+      stories.unshift({
+        username: 'Your Story',
+        avatar: profile.avatar_path,
+        isSeen: true,
+        id: 'me'
+      });
+    }
+    return stories;
+  },
+
+  async getFeedPosts() {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    const myUser = profile?.username || 'me';
+
+    const rows: any[] = await db.getAllAsync(`
+      SELECT p.*, s.display_name, s.avatar_path,
+      w.name as workout_name, w.total_volume, w.duration_minutes,
+      (SELECT COUNT(*) FROM reported_posts r WHERE r.post_id = p.id) as report_count,
+      (SELECT COUNT(*) FROM post_comments c WHERE c.post_id = p.id) as comments_count,
+      (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.id AND l.username = ?) as is_liked
+      FROM feed_posts p
+      JOIN social_profile s ON p.author_username = s.username
+      LEFT JOIN workout_sessions w ON p.workout_ref_id = w.id
+      WHERE p.ai_approved = 1 AND report_count = 0
+      ORDER BY p.created_at DESC
+    `, [myUser]);
+    return rows;
+  },
 };

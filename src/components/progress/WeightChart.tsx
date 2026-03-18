@@ -65,25 +65,26 @@ export default function WeightChart({ data, goalWeight, compact = false }: Props
         areaChart
         curved
         data={points}
-        data2={trendLineData || undefined}
         hideDataPoints={compact}
-        spacing={compact ? 30 : 50}
-        initialSpacing={10}
+        spacing={compact ? 30 : 60}
+        initialSpacing={20}
         color={Colors.dark.cyan}
         thickness={3}
         startFillColor={Colors.dark.cyan}
         endFillColor={Colors.dark.cyan}
-        startOpacity={0.3}
-        endOpacity={0.05}
-        color2={Colors.dark.muted}
-        thickness2={1}
+        startOpacity={0.2}
+        endOpacity={0.01}
         yAxisColor="transparent"
         xAxisColor="transparent"
+        rulesType="dashed"
+        rulesColor="#333"
+        dashWidth={4}
+        dashGap={4}
         yAxisTextStyle={styles.axisText}
         yAxisOffset={minVal}
         maxValue={maxVal}
         noOfSections={4}
-        height={compact ? 100 : 180}
+        height={compact ? 120 : 200}
         pointerConfig={{
           pointerStripColor: Colors.dark.cyan,
           pointerStripWidth: 2,
@@ -99,8 +100,8 @@ export default function WeightChart({ data, goalWeight, compact = false }: Props
         referenceLine1Position={goalWeight}
         referenceLine1Config={{
           color: Colors.dark.rose,
-          dashWidth: 2,
-          dashGap: 4,
+          dashWidth: 5,
+          dashGap: 5,
           thickness: 1,
         }}
       />

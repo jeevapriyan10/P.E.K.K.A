@@ -12,6 +12,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import StreakHeatmap from '../../src/components/dashboard/StreakHeatmap';
 import AISummaryCard from '../../src/components/ai/AISummaryCard';
 import AnomalyBanner from '../../src/components/ai/AnomalyBanner';
+import { Avatar } from '../../src/components/ui/Avatar';
+import { socialDb } from '../../src/db/socialDb';
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -36,6 +38,7 @@ export default function Dashboard() {
   const [heatmapData, setHeatmapData] = useState<{[key: string]: number}>({});
   const [todaySteps, setTodaySteps] = useState(0);
   const [workoutDone, setWorkoutDone] = useState(false);
+  const [avatar, setAvatar] = useState<string | null>(null);
 
   const loadData = async () => {
     if (!db || !isReady) return;
@@ -89,6 +92,14 @@ export default function Dashboard() {
       nutrition.forEach(n => counts[n.date] = (counts[n.date] || 0) + 1);
       setHeatmapData(counts);
 
+      // Load avatar from social profile
+      const sProfile: any = await socialDb.getMyProfileSettings();
+      if (sProfile && sProfile.avatar_path) {
+        setAvatar(sProfile.avatar_path);
+      } else {
+        setAvatar(null);
+      }
+
     } catch (e) {
       console.warn('Failed to load dashboard data', e);
     }
@@ -130,7 +141,7 @@ export default function Dashboard() {
             <Text style={styles.date}>{getFormattedDate()}</Text>
           </View>
           <TouchableOpacity onPress={() => router.push('/settings')}>
-            <MaterialCommunityIcons name="account-circle" size={40} color={Colors.dark.text} />
+            <Avatar source={avatar || ''} size={40} />
           </TouchableOpacity>
         </View>
 
