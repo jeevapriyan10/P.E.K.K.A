@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Modal, Alert, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -102,6 +103,15 @@ export default function ProgressPhotosScreen() {
         onPress={() => compareMode ? toggleCompare(item.id) : setSelectedPhoto(item)}
       >
         <Image source={{ uri: PHOTO_DIR + item.photo_path }} style={styles.photo} />
+        <TouchableOpacity 
+          style={styles.deleteIcon} 
+          onPress={(e) => {
+            e.stopPropagation();
+            deletePhoto(item.id, item.photo_path);
+          }}
+        >
+          <MaterialCommunityIcons name="trash-can-outline" size={18} color={Colors.dark.rose} />
+        </TouchableOpacity>
         <View style={styles.photoInfo}>
            <Text style={styles.photoDate}>{item.date}</Text>
            <Text style={styles.photoWeight}>{item.weight_kg}kg</Text>
@@ -203,6 +213,7 @@ const styles = StyleSheet.create({
   photoCard: { flex: 1, margin: 8, backgroundColor: Colors.dark.bg2, borderRadius: 12, overflow: 'hidden' },
   photoCardSelected: { borderWidth: 2, borderColor: Colors.dark.lime },
   photo: { width: '100%', height: 200 },
+  deleteIcon: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', padding: 6, borderRadius: 8 },
   photoInfo: { padding: 8 },
   photoDate: { color: Colors.dark.text, fontSize: 11, fontWeight: 'bold' },
   photoWeight: { color: Colors.dark.muted, fontSize: 10, marginTop: 2 },

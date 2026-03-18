@@ -2,7 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { useDatabase } from '../../src/providers/DatabaseProvider';
 import { Colors } from '../../src/constants/colors';
@@ -25,6 +25,7 @@ function getFormattedDate() {
 }
 
 export default function Dashboard() {
+  const router = useRouter();
   const { db, isReady } = useDatabase();
   const netInfo = useNetInfo();
   
@@ -128,7 +129,9 @@ export default function Dashboard() {
             <Text style={styles.greeting}>{getGreeting()}, {name}</Text>
             <Text style={styles.date}>{getFormattedDate()}</Text>
           </View>
-          <MaterialCommunityIcons name="account-circle" size={40} color={Colors.dark.text} />
+          <TouchableOpacity onPress={() => router.push('/settings')}>
+            <MaterialCommunityIcons name="account-circle" size={40} color={Colors.dark.text} />
+          </TouchableOpacity>
         </View>
 
         {/* Daily Progress */}

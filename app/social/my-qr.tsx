@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { QRCode } from 'react-native-qrcode-svg';
+import QRCode from 'react-native-qrcode-svg';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import { socialDb, ProfileExport } from '../../src/db/socialDb';
@@ -24,16 +24,21 @@ export default function MyQRCode() {
     const data = await socialDb.generateExportPayload();
     if (!data) {
       Alert.alert("Profile Required", "Set up your profile before sharing.");
-      router.replace('/social/profile-setup');
+      router.replace('/settings');
       return;
     }
 
-    // Simple base64 encoding (btoa is not in RN, so we use a robust method or just JSON for simplicity)
-    // Here we encode it as a Base64 string to keep it compact and slightly obfuscated
-    const json = JSON.stringify(data);
-    const base64 = btoa_custom(json);
-    setPayload(base64);
-    setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    try {
+      const json = JSON.stringify(data);
+      // UTF-8 friendly base64
+      const utf8 = unescape(encodeURIComponent(json));
+      const base64 = btoa_custom(utf8);
+      setPayload(base64);
+      setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    } catch (err) {
+      console.warn('QR Error:', err);
+      Alert.alert("Error", "Failed to generate QR code correctly.");
+    }
   };
 
   const handleShare = async () => {

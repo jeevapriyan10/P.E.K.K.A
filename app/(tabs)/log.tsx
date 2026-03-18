@@ -98,7 +98,8 @@ export default function NutritionDashboard() {
       <View style={styles.headerBar}>
         <Text style={styles.headerDate}>{currentDate}</Text>
         <TouchableOpacity onPress={() => router.push('/nutrition/food-camera')} style={styles.cameraBtn}>
-           <Text style={styles.cameraBtnText}>📷 AI Scan</Text>
+           <MaterialCommunityIcons name="camera" size={20} color={Colors.dark.lime} style={{marginRight: 6}} />
+           <Text style={styles.cameraBtnText}>AI Scan</Text>
         </TouchableOpacity>
       </View>
 

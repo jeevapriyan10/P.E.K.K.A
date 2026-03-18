@@ -258,6 +258,7 @@ export async function initializeDatabase(db: SQLite.SQLiteDatabase) {
     try { await db.execAsync('ALTER TABLE social_profile ADD COLUMN share_nutrition INTEGER DEFAULT 1'); } catch (e) {}
     try { await db.execAsync('ALTER TABLE social_profile ADD COLUMN share_steps INTEGER DEFAULT 1'); } catch (e) {}
     try { await db.execAsync('ALTER TABLE social_profile ADD COLUMN share_achievements INTEGER DEFAULT 1'); } catch (e) {}
+    try { await db.execAsync('ALTER TABLE feed_posts ADD COLUMN category TEXT'); } catch (e) {}
 
     console.log("Database initialized successfully");
   } catch (error) {

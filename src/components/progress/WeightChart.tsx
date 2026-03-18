@@ -26,17 +26,19 @@ export default function WeightChart({ data, goalWeight, compact = false }: Props
   }
 
   const points = data.slice(-30).map(p => ({
-    ...p,
+    value: p.value,
+    label: p.label,
     dataPointText: compact ? undefined : `${p.value}`,
     dataPointColor: Colors.dark.cyan,
   }));
   
   const values = points.map(p => p.value);
-  const minVal = Math.min(...values, goalWeight) - 2;
-  const maxVal = Math.max(...values, goalWeight) + 2;
+  const minVal = Math.floor(Math.min(...values, goalWeight) - 5);
+  const maxVal = Math.ceil(Math.max(...values, goalWeight) + 5);
 
   const computeTrendLine = () => {
     const n = points.length;
+    if (n < 2) return null;
     let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
     points.forEach((p, i) => {
       sumX += i;
@@ -48,7 +50,8 @@ export default function WeightChart({ data, goalWeight, compact = false }: Props
     if (denominator === 0) return null;
     const m = (n * sumXY - sumX * sumY) / denominator;
     const b = (sumY - m * sumX) / n;
-    return Array.from({ length: n + 7 }, (_, i) => ({
+    
+    return points.map((_, i) => ({
       value: m * i + b,
       hideDataPoint: true,
     }));

@@ -85,12 +85,12 @@ const BattleSubScreen = ({ friends, myProfile, onRefresh }: any) => {
                <Text style={styles.meName}>{myProfile.display_name}</Text>
                <Text style={styles.meUsername}>@{myProfile.username}</Text>
              </View>
-             <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/social/profile-setup' as any)}>
+             <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/settings' as any)}>
                <MaterialCommunityIcons name="pencil-outline" size={20} color="#AAA" />
              </TouchableOpacity>
            </View>
          ) : (
-           <TouchableOpacity style={styles.setupBtn} onPress={() => router.push('/social/profile-setup' as any)}>
+           <TouchableOpacity style={styles.setupBtn} onPress={() => router.push('/settings' as any)}>
               <MaterialCommunityIcons name="account-plus-outline" size={32} color={Colors.dark.lime} />
               <Text style={styles.setupText}>Set up your social profile</Text>
            </TouchableOpacity>
@@ -211,12 +211,12 @@ const ProfileSubScreen = ({ myProfile }: any) => {
                   <View style={styles.pStatItem}><Text style={styles.pStatVal}>{myProfile.stats.achievements_count}</Text><Text style={styles.pStatLabel}>Medals</Text></View>
                </View>
 
-               <TouchableOpacity style={styles.editProfileBtn} onPress={() => router.push('/social/profile-setup' as any)}>
+               <TouchableOpacity style={styles.editProfileBtn} onPress={() => router.push('/settings' as any)}>
                   <Text style={styles.editProfileText}>Edit Profile</Text>
                </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity style={styles.setupBtn} onPress={() => router.push('/social/profile-setup' as any)}>
+            <TouchableOpacity style={styles.setupBtn} onPress={() => router.push('/settings' as any)}>
                <Text style={styles.setupText}>Set up your social profile</Text>
             </TouchableOpacity>
           )}

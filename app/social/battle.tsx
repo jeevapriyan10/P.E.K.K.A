@@ -53,7 +53,7 @@ export default function StatsBattle() {
           <MaterialCommunityIcons name="shield-lock" size={80} color={Colors.dark.amber} />
           <Text style={styles.emptyTitle}>Profile is Private</Text>
           <Text style={styles.emptyText}>You cannot battle stats while your profile is private. Enable "Public Profile" in settings to start competing.</Text>
-          <TouchableOpacity style={styles.scanBtn} onPress={() => router.push('/social/profile-setup' as any)}>
+          <TouchableOpacity style={styles.scanBtn} onPress={() => router.push('/settings' as any)}>
             <Text style={styles.scanBtnText}>Adjust Privacy</Text>
           </TouchableOpacity>
         </View>

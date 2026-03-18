@@ -46,6 +46,13 @@ export default function Onboarding() {
         [name, a, sex, h, w, goal, activity]
       );
       
+      // Initialize social profile too for "Common Profile"
+      const username = name.toLowerCase().replace(/\s+/g, '_') + '_' + Math.floor(Math.random()*1000);
+      await db.runAsync(
+        'INSERT INTO social_profile (username, display_name, bio, avatar_path, is_public, created_at) VALUES (?, ?, ?, ?, 1, datetime("now"))',
+        [username, name, `Fitness enthusiast since ${new Date().getFullYear()}`, 'arm-flex']
+      );
+
       await AsyncStorage.setItem(StorageKeys.ONBOARDING_COMPLETE, '1');
       router.replace('/(tabs)');
     } catch (e) {
