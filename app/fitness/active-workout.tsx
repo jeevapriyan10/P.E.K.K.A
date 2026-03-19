@@ -76,6 +76,23 @@ export default function ActiveWorkoutScreen() {
   };
 
   const handleFinish = async () => {
+    // Validation
+    if (!activeWorkoutName || activeWorkoutName.trim().length === 0) {
+      Alert.alert("Cannot Complete", "Workout name is missing. Please start a workout properly.");
+      return;
+    }
+
+    if (activeExercises.length === 0) {
+      Alert.alert("Cannot Complete", "Add at least one exercise before finishing.");
+      return;
+    }
+
+    const totalDoneSets = activeExercises.reduce((sum, ex) => sum + ex.sets.filter(s => s.done).length, 0);
+    if (totalDoneSets === 0) {
+      Alert.alert("Cannot Complete", "Mark at least one set as done before finishing.");
+      return;
+    }
+
     // Calorie Calculation: MET * weight * time(hr)
     // resistance training MET is usually 3.5 to 6. Adjust based on RPE.
     const weight = userProfile?.weight_kg || 75;
@@ -88,23 +105,28 @@ export default function ActiveWorkoutScreen() {
       ex.sets.forEach(s => { if (s.done) vol += (s.weight * s.reps); });
     });
 
-    const sessionId = await saveWorkoutSession(
-      { 
-        name: activeWorkoutName, 
-        duration_minutes: Math.round(timer / 60), 
-        total_volume: vol, 
-        calories_burned: caloriesBurned,
-        notes: '', 
-        rpe_score: rpe 
-      },
-      activeExercises.map(ex => ({ ...ex, sets: ex.sets.filter(s => s.done) }))
-    );
+    try {
+      const sessionId = await saveWorkoutSession(
+        {
+          name: activeWorkoutName,
+          duration_minutes: Math.round(timer / 60),
+          total_volume: vol,
+          calories_burned: caloriesBurned,
+          notes: '',
+          rpe_score: rpe
+        },
+        activeExercises.map(ex => ({ ...ex, sets: ex.sets.filter(s => s.done) }))
+      );
 
-    checkAchievements(showAchievement);
-    endWorkout();
-    deactivateKeepAwake();
-    setCompleteModal(false);
-    router.replace(`/fitness/workout-summary?id=${sessionId}`);
+      checkAchievements(showAchievement);
+      endWorkout();
+      deactivateKeepAwake();
+      setCompleteModal(false);
+      router.replace(`/fitness/workout-summary?id=${sessionId}`);
+    } catch (error) {
+      console.error('Failed to save workout:', error);
+      Alert.alert("Error", "Failed to save workout. Please try again.");
+    }
   };
 
   if (showTemplates) {

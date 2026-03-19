@@ -60,7 +60,7 @@ export default function ProfileSetup() {
       quality: 0.5,
     });
 
-    if (!result.canceled) {
+    if (!result.canceled && result.assets && result.assets.length > 0) {
       updateField('avatar', result.assets[0].uri);
     }
   };

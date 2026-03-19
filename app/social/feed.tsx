@@ -13,9 +13,11 @@ export default function Feed() {
   const [posts, setPosts] = useState<any[]>([]);
   const [stories, setStories] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
+      setError(null);
       const [postData, storyData] = await Promise.all([
         socialDb.getFeedPosts(),
         socialDb.getStories()
@@ -24,6 +26,7 @@ export default function Feed() {
       setStories(storyData);
     } catch (e) {
       console.error(e);
+      setError('Failed to load feed. Pull down to retry.');
     }
   };
 
@@ -33,6 +36,7 @@ export default function Feed() {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    setError(null);
     await loadData();
     setRefreshing(false);
   };
@@ -83,22 +87,32 @@ export default function Feed() {
         keyExtractor={item => item.id.toString()}
         ListHeaderComponent={renderStories}
         renderItem={({ item }) => (
-          <PostCard 
-            post={item} 
+          <PostCard
+            post={item}
             onRefresh={onRefresh}
-            onReport={(id) => router.push({ pathname: '/social/report-post', params: { id } } as any)} 
+            onReport={(id) => router.push({ pathname: '/social/report-post', params: { id } } as any)}
           />
         )}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.dark.lime} />
         }
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>Nothing to show</Text>
-            <TouchableOpacity style={styles.createAction} onPress={() => router.push('/social/create-post' as any)}>
-              <Text style={styles.createActionText}>Share your first progress</Text>
-            </TouchableOpacity>
-          </View>
+          error ? (
+            <View style={styles.errorContainer}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={48} color={Colors.dark.amber} />
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity style={styles.retryBtn} onPress={onRefresh}>
+                <Text style={styles.retryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>Nothing to show</Text>
+              <TouchableOpacity style={styles.createAction} onPress={() => router.push('/social/create-post' as any)}>
+                <Text style={styles.createActionText}>Share your first progress</Text>
+              </TouchableOpacity>
+            </View>
+          )
         }
       />
     </View>
@@ -119,5 +133,9 @@ const styles = StyleSheet.create({
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 100, padding: 40 },
   emptyTitle: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
   createAction: { marginTop: 20, backgroundColor: Colors.dark.lime, paddingHorizontal: 25, paddingVertical: 12, borderRadius: 20 },
-  createActionText: { color: '#000', fontWeight: 'bold' }
+  createActionText: { color: '#000', fontWeight: 'bold' },
+  errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 100, padding: 40, gap: 16 },
+  errorText: { color: Colors.dark.amber, fontSize: 16, textAlign: 'center' },
+  retryBtn: { backgroundColor: Colors.dark.lime, paddingHorizontal: 32, paddingVertical: 12, borderRadius: 20 },
+  retryText: { color: '#000', fontWeight: 'bold' }
 });

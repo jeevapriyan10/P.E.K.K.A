@@ -36,7 +36,9 @@ export default function CreatePost() {
       allowsEditing: true,
       quality: 0.8,
     });
-    if (!result.canceled) setImage(result.assets[0].uri);
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setImage(result.assets[0].uri);
+    }
   };
 
   const handleToggleAttachment = async (type: 'workout' | 'nutrition') => {

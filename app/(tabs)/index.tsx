@@ -14,6 +14,7 @@ import AISummaryCard from '../../src/components/ai/AISummaryCard';
 import AnomalyBanner from '../../src/components/ai/AnomalyBanner';
 import { Avatar } from '../../src/components/ui/Avatar';
 import { socialDb } from '../../src/db/socialDb';
+import { calculateTDEE } from '../../src/utils/tdeeCalculator';
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -46,7 +47,7 @@ export default function Dashboard() {
       const userResult: any = await db.getFirstAsync('SELECT * FROM users ORDER BY id DESC LIMIT 1');
       if (userResult) {
         setName(userResult.name || 'User');
-        const { calories, protein_g } = require('../../src/utils/tdeeCalculator').calculateTDEE(userResult);
+        const { calories, protein_g } = calculateTDEE(userResult);
         setGoals(prev => ({ ...prev, calories, protein: protein_g }));
       }
 

@@ -1,5 +1,6 @@
 // filepath: app/nutrition/barcode-scanner.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
@@ -17,6 +18,13 @@ export default function BarcodeScannerScreen() {
     if (!permission) requestPermission();
   }, [permission]);
 
+  // Reset scanner when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      setScanned(false);
+    }, [])
+  );
+
   if (!permission) return <View style={styles.center}><ActivityIndicator color={Colors.dark.lime}/></View>;
   if (!permission.granted) return (
     <View style={styles.center}>
@@ -30,27 +38,34 @@ export default function BarcodeScannerScreen() {
     setScanned(true);
     setLoading(true);
 
-    const offResult = await fetchFoodByBarcode(result.data);
-    setLoading(false);
+    try {
+      const offResult = await fetchFoodByBarcode(result.data);
 
-    if (offResult) {
-       router.replace({
-         pathname: '/nutrition/food-detail',
-         params: {
+      if (offResult) {
+        router.replace({
+          pathname: '/nutrition/food-detail',
+          params: {
             name: offResult.name,
             calories: offResult.calories_per_100g.toString(),
             protein: offResult.protein_per_100g.toString(),
             carbs: offResult.carbs_per_100g.toString(),
             fat: offResult.fat_per_100g.toString(),
             fiber: offResult.fiber_per_100g.toString()
-         }
-       });
-    } else {
-       // navigate custom food with barcode prefilled
-       router.replace({
-         pathname: '/nutrition/custom-food',
-         params: { barcode: result.data, name: 'Unknown Product' }
-       });
+          }
+        });
+      } else {
+        // navigate custom food with barcode prefilled
+        router.replace({
+          pathname: '/nutrition/custom-food',
+          params: { barcode: result.data, name: 'Unknown Product' }
+        });
+      }
+    } catch (error) {
+      console.error('Barcode scan error:', error);
+      // Reset scanned state on error to allow retry
+      setTimeout(() => setScanned(false), 1000);
+    } finally {
+      setLoading(false);
     }
   };
 

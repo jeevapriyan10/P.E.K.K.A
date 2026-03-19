@@ -1,5 +1,5 @@
 // filepath: src/providers/AchievementProvider.tsx
-import React, { createContext, useContext, useState, useRef } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { Colors } from '../constants/colors';
@@ -15,11 +15,17 @@ export function AchievementProvider({ children }: { children: React.ReactNode })
   const [data, setData] = useState({ name: '', icon: '' });
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(-100)).current;
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showAchievement = (name: string, icon: string) => {
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
     setData({ name, icon });
     setVisible(true);
-    
+
     // Animation sequence
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
@@ -27,13 +33,22 @@ export function AchievementProvider({ children }: { children: React.ReactNode })
     ]).start();
 
     // Hide after 4 seconds
-    setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       Animated.parallel([
         Animated.timing(fadeAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
         Animated.timing(slideAnim, { toValue: -100, duration: 600, useNativeDriver: true }),
       ]).start(() => setVisible(false));
     }, 4000);
   };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <AchievementContext.Provider value={{ showAchievement }}>

@@ -13,7 +13,7 @@ export default function Onboarding() {
   const router = useRouter();
   const { db, isReady } = useDatabase();
   const [step, setStep] = useState(1);
-  
+
   // Form State
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
@@ -26,8 +26,50 @@ export default function Onboarding() {
   const [goal, setGoal] = useState('Lose Fat');
   const [activity, setActivity] = useState('Light');
 
+  // Error State
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateStep = (currentStep: number): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (currentStep === 1) {
+      if (!name.trim()) {
+        newErrors.name = 'Please enter your name';
+      }
+      const ageNum = parseInt(age, 10);
+      if (!age || isNaN(ageNum) || ageNum < 1 || ageNum > 120) {
+        newErrors.age = 'Please enter a valid age (1-120)';
+      }
+    }
+
+    if (currentStep === 2) {
+      const heightNum = parseFloat(height);
+      if (!height || isNaN(heightNum) || heightNum <= 0) {
+        newErrors.height = 'Please enter a valid height';
+      }
+    }
+
+    if (currentStep === 3) {
+      const weightNum = parseFloat(weight);
+      if (!weight || isNaN(weightNum) || weightNum <= 0) {
+        newErrors.weight = 'Please enter a valid weight';
+      }
+      if (goalWeight) {
+        const goalWeightNum = parseFloat(goalWeight);
+        if (isNaN(goalWeightNum) || goalWeightNum <= 0) {
+          newErrors.goalWeight = 'Please enter a valid goal weight';
+        }
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const onNext = () => {
-    if (step < TOTAL_STEPS) setStep(step + 1);
+    if (validateStep(step)) {
+      if (step < TOTAL_STEPS) setStep(step + 1);
+    }
   };
 
   const onBack = () => {
@@ -35,6 +77,19 @@ export default function Onboarding() {
   };
 
   const onFinish = async () => {
+    // Validate all steps before finishing
+    const isValidStep1 = validateStep(1);
+    const isValidStep2 = validateStep(2);
+    const isValidStep3 = validateStep(3);
+
+    if (!isValidStep1 || !isValidStep2 || !isValidStep3) {
+      // Go to first error step
+      if (!isValidStep1) setStep(1);
+      else if (!isValidStep2) setStep(2);
+      else if (!isValidStep3) setStep(3);
+      return;
+    }
+
     if (!isReady || !db) return;
     try {
       const h = parseFloat(height) || 0;
@@ -45,7 +100,7 @@ export default function Onboarding() {
         'INSERT INTO users (name, age, sex, height_cm, weight_kg, goal, activity_level, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime("now"), datetime("now"))',
         [name, a, sex, h, w, goal, activity]
       );
-      
+
       // Initialize social profile too for "Common Profile"
       const username = name.toLowerCase().replace(/\s+/g, '_') + '_' + Math.floor(Math.random()*1000);
       await db.runAsync(
@@ -95,10 +150,12 @@ export default function Onboarding() {
         {step === 1 && (
           <View style={styles.card}>
             <Text style={styles.label}>What is your name?</Text>
-            <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="John Doe" placeholderTextColor={Colors.dark.muted} />
-            
+            <TextInput style={[styles.input, errors.name && styles.inputError]} value={name} onChangeText={setName} placeholder="John Doe" placeholderTextColor={Colors.dark.muted} />
+            {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+
             <Text style={styles.label}>What is your age?</Text>
-            <TextInput style={styles.input} value={age} onChangeText={setAge} placeholder="25" keyboardType="numeric" placeholderTextColor={Colors.dark.muted} />
+            <TextInput style={[styles.input, errors.age && styles.inputError]} value={age} onChangeText={setAge} placeholder="25" keyboardType="numeric" placeholderTextColor={Colors.dark.muted} />
+            {errors.age && <Text style={styles.errorText}>{errors.age}</Text>}
           </View>
         )}
 
@@ -106,14 +163,15 @@ export default function Onboarding() {
           <View style={styles.card}>
             <Text style={styles.label}>Biological Sex</Text>
             {renderChips(['Male', 'Female', 'Other'], sex, setSex)}
-            
+
             <Text style={styles.label}>Height ({heightUnit})</Text>
             <View style={styles.row}>
-              <TextInput style={[styles.input, {flex: 1}]} value={height} onChangeText={setHeight} keyboardType="numeric" placeholder="175" placeholderTextColor={Colors.dark.muted} />
+              <TextInput style={[styles.input, {flex: 1}, errors.height && styles.inputError]} value={height} onChangeText={setHeight} keyboardType="numeric" placeholder="175" placeholderTextColor={Colors.dark.muted} />
               <TouchableOpacity style={styles.unitToggle} onPress={() => setHeightUnit(h => h === 'cm' ? 'ft' : 'cm')}>
                 <Text style={styles.unitText}>{heightUnit}</Text>
               </TouchableOpacity>
             </View>
+            {errors.height && <Text style={styles.errorText}>{errors.height}</Text>}
           </View>
         )}
 
@@ -121,14 +179,16 @@ export default function Onboarding() {
           <View style={styles.card}>
             <Text style={styles.label}>Current Weight ({weightUnit})</Text>
             <View style={styles.row}>
-              <TextInput style={[styles.input, {flex: 1}]} value={weight} onChangeText={setWeight} keyboardType="numeric" placeholder="70" placeholderTextColor={Colors.dark.muted} />
+              <TextInput style={[styles.input, {flex: 1}, errors.weight && styles.inputError]} value={weight} onChangeText={setWeight} keyboardType="numeric" placeholder="70" placeholderTextColor={Colors.dark.muted} />
               <TouchableOpacity style={styles.unitToggle} onPress={() => setWeightUnit(w => w === 'kg' ? 'lbs' : 'kg')}>
                 <Text style={styles.unitText}>{weightUnit}</Text>
               </TouchableOpacity>
             </View>
+            {errors.weight && <Text style={styles.errorText}>{errors.weight}</Text>}
 
-            <Text style={styles.label}>Goal Weight ({weightUnit})</Text>
-            <TextInput style={styles.input} value={goalWeight} onChangeText={setGoalWeight} keyboardType="numeric" placeholder="65" placeholderTextColor={Colors.dark.muted} />
+            <Text style={styles.label}>Goal Weight ({weightUnit}) (Optional)</Text>
+            <TextInput style={[styles.input, errors.goalWeight && styles.inputError]} value={goalWeight} onChangeText={setGoalWeight} keyboardType="numeric" placeholder="65" placeholderTextColor={Colors.dark.muted} />
+            {errors.goalWeight && <Text style={styles.errorText}>{errors.goalWeight}</Text>}
           </View>
         )}
 
@@ -169,6 +229,8 @@ const styles = StyleSheet.create({
   card: { gap: 16 },
   label: { fontSize: 16, color: Colors.dark.text, fontWeight: '600', marginTop: 8 },
   input: { backgroundColor: Colors.dark.bg2, borderWidth: 1, borderColor: Colors.dark.border, borderRadius: 12, padding: 16, color: Colors.dark.text, fontSize: 16 },
+  inputError: { borderColor: Colors.dark.rose },
+  errorText: { color: Colors.dark.rose, fontSize: 12, marginTop: 4, marginLeft: 4 },
   row: { flexDirection: 'row', gap: 12, alignItems: 'center' },
   unitToggle: { backgroundColor: Colors.dark.bg3, paddingHorizontal: 16, paddingVertical: 16, borderRadius: 12, borderWidth: 1, borderColor: Colors.dark.border },
   unitText: { color: Colors.dark.lime, fontWeight: 'bold' },

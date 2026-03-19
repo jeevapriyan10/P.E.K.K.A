@@ -6,7 +6,15 @@ import NetInfo from '@react-native-community/netinfo';
 
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_KEY;
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-const API_URL = `${BASE_URL}?key=${GEMINI_API_KEY}`;
+
+// Validate API key exists
+let API_URL: string;
+if (GEMINI_API_KEY) {
+  API_URL = `${BASE_URL}?key=${GEMINI_API_KEY}`;
+} else {
+  // API URL will be invalid; callGemini will return fallback
+  API_URL = BASE_URL;
+}
 
 const DAILY_LIMIT = 20;
 const CACHE_EXPIRY_HOURS = 24;
@@ -80,6 +88,12 @@ async function setCachedResponse(promptHash: string, response: string) {
 const FALLBACK_RESPONSE = "I'm currently resting. Please check back later for more AI insights!";
 
 async function callGemini(prompt: string): Promise<string> {
+  // Check if API key is configured
+  if (!GEMINI_API_KEY) {
+    console.warn('Gemini API key not configured. Set EXPO_PUBLIC_GEMINI_KEY in your environment.');
+    return FALLBACK_RESPONSE;
+  }
+
   const netInfo = await NetInfo.fetch();
   if (!netInfo.isConnected) {
     throw new Error('Offline');

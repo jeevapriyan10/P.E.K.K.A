@@ -85,11 +85,34 @@ export default function SettingsScreen() {
 
   const saveEverything = async () => {
     if (!db || !profileData.userId) return;
+
+    // Validation
+    const ageNum = profileData.age ? parseInt(profileData.age, 10) : null;
+    const heightNum = profileData.height_cm ? parseFloat(profileData.height_cm) : null;
+    const weightNum = profileData.weight_kg ? parseFloat(profileData.weight_kg) : null;
+
+    if (profileData.name.trim().length === 0) {
+      Alert.alert("Validation Error", "Please enter your name");
+      return;
+    }
+    if (isNaN(ageNum) || ageNum < 1 || ageNum > 120) {
+      Alert.alert("Validation Error", "Please enter a valid age (1-120)");
+      return;
+    }
+    if (isNaN(heightNum) || heightNum <= 0) {
+      Alert.alert("Validation Error", "Please enter a valid height");
+      return;
+    }
+    if (isNaN(weightNum) || weightNum <= 0) {
+      Alert.alert("Validation Error", "Please enter a valid weight");
+      return;
+    }
+
     try {
       // Update Users Table
       await db.runAsync(
         'UPDATE users SET name=?, age=?, sex=?, height_cm=?, weight_kg=?, activity_level=?, goal=?, updated_at=datetime("now") WHERE id=?',
-        [profileData.name, parseInt(profileData.age), profileData.gender, parseFloat(profileData.height_cm), parseFloat(profileData.weight_kg), profileData.activity_level, profileData.goal, profileData.userId]
+        [profileData.name.trim(), ageNum, profileData.gender, heightNum, weightNum, profileData.activity_level, profileData.goal, profileData.userId]
       );
 
       // Update Social Profile Table
@@ -155,7 +178,7 @@ export default function SettingsScreen() {
       aspect: [1, 1],
       quality: 0.5,
     });
-    if (!result.canceled) {
+    if (!result.canceled && result.assets && result.assets.length > 0) {
       setProfileData(prev => ({ ...prev, avatar: result.assets[0].uri }));
     }
   };

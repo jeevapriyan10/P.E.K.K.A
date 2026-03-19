@@ -8,6 +8,7 @@ import { AchievementProvider } from '../src/providers/AchievementProvider';
 import { StorageKeys } from '../src/constants/storageKeys';
 import LoadingState from '../src/components/ui/LoadingState';
 import { notificationService } from '../src/services/notificationService';
+import { ErrorBoundary } from '../src/components/ui/ErrorBoundary';
 
 export default function RootLayout() {
   const [isChecked, setIsChecked] = useState(false);
@@ -47,13 +48,15 @@ export default function RootLayout() {
   }
 
   return (
-    <DatabaseProvider>
-      <AchievementProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="onboarding" />
-          <Stack.Screen name="(tabs)" />
-        </Stack>
-      </AchievementProvider>
-    </DatabaseProvider>
+    <ErrorBoundary>
+      <DatabaseProvider>
+        <AchievementProvider>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="onboarding" />
+            <Stack.Screen name="(tabs)" />
+          </Stack>
+        </AchievementProvider>
+      </DatabaseProvider>
+    </ErrorBoundary>
   );
 }
