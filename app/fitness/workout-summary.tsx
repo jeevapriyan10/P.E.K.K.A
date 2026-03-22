@@ -17,6 +17,8 @@ export default function WorkoutSummaryScreen() {
   const [exercises, setExercises] = useState<any[]>([]);
   const [activations, setActivations] = useState<Record<string, number>>({});
   const [streak, setStreak] = useState(0);
+  const [totalSets, setTotalSets] = useState(0);
+  const [totalReps, setTotalReps] = useState(0);
 
   useEffect(() => {
     const load = async () => {
@@ -24,7 +26,17 @@ export default function WorkoutSummaryScreen() {
         const data = await getSessionDetails(Number(id));
         setSession(data.session);
         setExercises(data.exercises);
-        
+
+        // Calculate total sets and reps
+        let sets = 0;
+        let reps = 0;
+        data.exercises.forEach((e: any) => {
+          sets += e.sets.length;
+          reps += e.sets.reduce((sum: number, s: any) => sum + s.reps, 0);
+        });
+        setTotalSets(sets);
+        setTotalReps(reps);
+
         const acts: Record<string, number> = {};
         data.exercises.forEach((e: any) => {
           if (e.muscle_group_primary) {
@@ -63,8 +75,10 @@ export default function WorkoutSummaryScreen() {
         <View style={styles.statsGrid}>
            <StatBox icon="fire" val={session.calories_burned || 0} label="Kcal" color={Colors.dark.amber} />
            <StatBox icon="clock-outline" val={session.duration_minutes} label="Min" color={Colors.dark.sky} />
-           <StatBox icon="arm-flex" val={Math.round(session.total_volume)} label="Vol (kg)" color={Colors.dark.lime} />
            <StatBox icon="trophy-outline" val={exercises.filter(e=>e.is_pr).length} label="PRs" color="#FFD700" />
+           <StatBox icon="weight-bar" val={totalSets} label="Sets" color={Colors.dark.cyan} />
+           <StatBox icon="repeat" val={totalReps} label="Reps" color={Colors.dark.violet} />
+           {/* Volume removed per design - not emphasized */}
         </View>
 
         <View style={styles.section}>

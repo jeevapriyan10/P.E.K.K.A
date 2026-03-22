@@ -19,13 +19,21 @@ export default function StoryViewer() {
     const me: any = await socialDb.getMyProfileSettings();
     const target = id === 'me' ? me?.username : id;
     const rows = await db.getAllAsync(`
-      SELECT st.*, sp.avatar_path 
+      SELECT st.*, sp.avatar_path
       FROM stories st
       JOIN social_profile sp ON st.author_username = sp.username
       WHERE st.author_username = ?
       ORDER BY st.created_at ASC
     `, [target]);
     setStories(rows);
+
+    // Mark all of this author's current batch as viewed (simple: mark all stories from this author)
+    if (me && target !== me.username) {
+      // Mark each story as viewed
+      for (const row of rows) {
+        await socialDb.markStoryViewed(row.id);
+      }
+    }
   };
 
   useEffect(() => { loadStories(); }, []);

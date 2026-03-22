@@ -275,6 +275,64 @@ export async function initializeDatabase(db: SQLite.SQLiteDatabase) {
         created_at TEXT,
         expires_at TEXT
       );
+
+      CREATE TABLE IF NOT EXISTS story_views (
+        story_id INTEGER,
+        viewer_username TEXT,
+        viewed_at TEXT,
+        PRIMARY KEY(story_id, viewer_username),
+        FOREIGN KEY(story_id) REFERENCES stories(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS saved_posts (
+        post_id INTEGER,
+        username TEXT,
+        saved_at TEXT,
+        PRIMARY KEY(post_id, username),
+        FOREIGN KEY(post_id) REFERENCES feed_posts(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS conversations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        participant1_username TEXT,
+        participant2_username TEXT,
+        last_message_at TEXT,
+        created_at TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id INTEGER,
+        sender_username TEXT,
+        text TEXT,
+        is_read INTEGER DEFAULT 0,
+        created_at TEXT,
+        FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_username TEXT,
+        actor_username TEXT,
+        type TEXT,
+        reference_id INTEGER,
+        is_read INTEGER DEFAULT 0,
+        created_at TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS muted_words (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT,
+        word TEXT,
+        created_at TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS blocked_users (
+        blocker_username TEXT,
+        blocked_username TEXT,
+        created_at TEXT,
+        PRIMARY KEY(blocker_username, blocked_username)
+      );
     `);
     
     // Developer Hotfixes for missing columns in existing DB
@@ -286,6 +344,14 @@ export async function initializeDatabase(db: SQLite.SQLiteDatabase) {
     try { await db.execAsync('ALTER TABLE social_profile ADD COLUMN share_steps INTEGER DEFAULT 1'); } catch (e) {}
     try { await db.execAsync('ALTER TABLE social_profile ADD COLUMN share_achievements INTEGER DEFAULT 1'); } catch (e) {}
     try { await db.execAsync('ALTER TABLE feed_posts ADD COLUMN category TEXT'); } catch (e) {}
+    // Social settings columns
+    try { await db.execAsync('ALTER TABLE social_profile ADD COLUMN content_strictness INTEGER DEFAULT 1'); } catch (e) {}
+    try { await db.execAsync('ALTER TABLE social_profile ADD COLUMN enable_anti_bullying INTEGER DEFAULT 1'); } catch (e) {}
+    try { await db.execAsync('ALTER TABLE social_profile ADD COLUMN privacy_messages TEXT DEFAULT "everyone"'); } catch (e) {}
+    try { await db.execAsync('ALTER TABLE social_profile ADD COLUMN story_visibility TEXT DEFAULT "public"'); } catch (e) {}
+    try { await db.execAsync('ALTER TABLE social_profile ADD COLUMN post_default_visibility TEXT DEFAULT "public"'); } catch (e) {}
+    // Notifications actor column
+    try { await db.execAsync('ALTER TABLE notifications ADD COLUMN actor_username TEXT'); } catch (e) {}
     
     // Engagement Hotfixes
     try { await db.execAsync('CREATE TABLE IF NOT EXISTS post_comments (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, username TEXT, display_name TEXT, avatar TEXT, text TEXT, likes_count INTEGER DEFAULT 0, created_at TEXT)'); } catch (e) {}

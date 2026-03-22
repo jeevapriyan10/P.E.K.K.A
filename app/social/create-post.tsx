@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { socialDb } from '../../src/db/socialDb';
 import { Colors } from '../../src/constants/colors';
+import { moderatePost } from '../../src/services/ai/hybrid';
 
 const VISIBILITY_OPTIONS = [
   { label: 'Public', value: 1, icon: 'earth' },
@@ -59,6 +60,20 @@ export default function CreatePost() {
     if (!text.trim() && !image && !attachment) {
       return Alert.alert("Error", "Please add content.");
     }
+
+    // Content moderation check
+    try {
+      const modResult = await moderatePost({ text: text.trim(), hasImage: !!image });
+      if (!modResult.approved) {
+        Alert.alert("Post Not Approved", modResult.reason || "Your post cannot be shared at this time.");
+        setIsPosting(false);
+        return;
+      }
+    } catch (e) {
+      console.error('Moderation error:', e);
+      // If moderation fails, allow posting? Safer to block? We'll allow to not block user.
+    }
+
     setIsPosting(true);
     try {
 

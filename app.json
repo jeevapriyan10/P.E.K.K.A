@@ -11,9 +11,9 @@
     "orientation": "portrait",
     "scheme": "pekka",
     "userInterfaceStyle": "automatic",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/logo/icon.svg",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/logo/splash.svg",
       "resizeMode": "contain",
       "backgroundColor": "#070709"
     },

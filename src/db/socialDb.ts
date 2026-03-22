@@ -294,7 +294,7 @@ export const socialDb = {
     const db = await getDb();
     const profile: any = await this.getMyProfileSettings();
     if (!profile) return;
-    
+
     const existing = await db.getFirstAsync('SELECT * FROM post_likes WHERE post_id = ? AND username = ?', [postId, profile.username]);
     if (existing) {
       await db.runAsync('DELETE FROM post_likes WHERE post_id = ? AND username = ?', [postId, profile.username]);
@@ -303,6 +303,8 @@ export const socialDb = {
     } else {
       await db.runAsync('INSERT INTO post_likes (post_id, username) VALUES (?, ?)', [postId, profile.username]);
       await db.runAsync('UPDATE feed_posts SET likes_count = likes_count + 1 WHERE id = ?', [postId]);
+      // Notify post author
+      await this.notifyLike(postId, profile.username);
       return true;
     }
   },
@@ -317,6 +319,8 @@ export const socialDb = {
        VALUES (?, ?, ?, ?, ?, ?)`,
       [postId, profile.username, profile.display_name, profile.avatar_path, text, now]
     );
+    // Notify post author
+    await this.notifyComment(postId, profile.username);
   },
 
   async getComments(postId: number) {
@@ -328,40 +332,36 @@ export const socialDb = {
     const db = await getDb();
     const profile: any = await this.getMyProfileSettings();
     const now = new Date().toISOString();
-    
+
     // Cleanup expired stories
     await db.runAsync('DELETE FROM stories WHERE expires_at < ?', [now]);
 
-    // Fetch active stories
+    // Fetch active stories individually with view status
     const storyRows: any[] = await db.getAllAsync(`
-      SELECT st.*, sp.avatar_path
+      SELECT st.*, sp.avatar_path,
+        EXISTS(SELECT 1 FROM story_views sv WHERE sv.story_id = st.id AND sv.viewer_username = ?) as is_viewed
       FROM stories st
       JOIN social_profile sp ON st.author_username = sp.username
       ORDER BY st.created_at DESC
-    `);
-    
-    const storiesMapping: Record<string, any> = {};
-    storyRows.forEach(row => {
-      if (!storiesMapping[row.author_username]) {
-        storiesMapping[row.author_username] = {
-          username: row.author_username,
-          avatar: row.avatar_path,
-          isSeen: false,
-          id: row.author_username
-        };
-      }
-    });
+    `, [profile?.username || '']);
 
-    const stories = Object.values(storiesMapping);
-    
+    const stories = storyRows.map(row => ({
+      id: row.id.toString(),
+      username: row.author_username,
+      avatar: row.avatar_path,
+      isSeen: row.is_viewed ? true : false
+    }));
+
+    // Prepend "Your Story" if not present
     if (profile && !stories.find(s => s.username === profile.username)) {
       stories.unshift({
+        id: 'me',
         username: 'Your Story',
         avatar: profile.avatar_path,
-        isSeen: true,
-        id: 'me'
+        isSeen: true
       });
     }
+
     return stories;
   },
 
@@ -384,4 +384,315 @@ export const socialDb = {
     `, [myUser]);
     return rows;
   },
+
+  // SAVED POSTS
+  async savePost(postId: number) {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    if (!profile) return;
+    const now = new Date().toISOString();
+    await db.runAsync('INSERT OR IGNORE INTO saved_posts (post_id, username, saved_at) VALUES (?, ?, ?)', [postId, profile.username, now]);
+  },
+
+  async unsavePost(postId: number) {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    if (!profile) return;
+    await db.runAsync('DELETE FROM saved_posts WHERE post_id = ? AND username = ?', [postId, profile.username]);
+  },
+
+  async getSavedPosts() {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    if (!profile) return [];
+    const rows: any[] = await db.getAllAsync(`
+      SELECT p.*, s.display_name, s.avatar_path,
+      (SELECT COUNT(*) FROM reported_posts r WHERE r.post_id = p.id) as report_count,
+      (SELECT COUNT(*) FROM post_comments c WHERE c.post_id = p.id) as comments_count,
+      (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.id AND l.username = ?) as is_liked
+      FROM saved_posts sp
+      JOIN feed_posts p ON sp.post_id = p.id
+      JOIN social_profile s ON p.author_username = s.username
+      WHERE sp.username = ? AND report_count = 0
+      ORDER BY sp.saved_at DESC
+    `, [profile.username, profile.username]);
+    return rows;
+  },
+
+  // MESSAGING
+  async getConversations() {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    if (!profile) return [];
+    const myUsername = profile.username;
+
+    // Get all conversations where user is participant1 or participant2
+    const rows: any[] = await db.getAllAsync(`
+      SELECT c.*,
+        sp.display_name as other_display_name, sp.avatar_path as other_avatar,
+        (SELECT text FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
+        (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_username != ? AND m.is_read = 0) as unread_count
+      FROM conversations c
+      JOIN social_profile sp ON (CASE WHEN c.participant1_username = ? THEN c.participant2_username ELSE c.participant1_username END) = sp.username
+      WHERE c.participant1_username = ? OR c.participant2_username = ?
+      ORDER BY c.last_message_at DESC
+    `, [myUsername, myUsername, myUsername, myUsername]);
+
+    return rows;
+  },
+
+  async getOrCreateConversation(otherUsername: string) {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    if (!profile) throw new Error('No profile');
+    const myUsername = profile.username;
+
+    // Check existing
+    const existing: any = await db.getFirstAsync(`
+      SELECT * FROM conversations
+      WHERE (participant1_username = ? AND participant2_username = ?)
+         OR (participant1_username = ? AND participant2_username = ?)
+    `, [myUsername, otherUsername, otherUsername, myUsername]);
+
+    if (existing) {
+      return existing.id;
+    }
+
+    // Create new
+    const now = new Date().toISOString();
+    const result = await db.runAsync(
+      'INSERT INTO conversations (participant1_username, participant2_username, last_message_at, created_at) VALUES (?, ?, ?, ?)',
+      [myUsername, otherUsername, now, now]
+    );
+    return result.lastInsertRowId as number;
+  },
+
+  async getMessages(conversationId: number) {
+    const db = await getDb();
+    const rows: any[] = await db.getAllAsync(
+      'SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC',
+      [conversationId]
+    );
+    return rows;
+  },
+
+  async sendMessage(conversationId: number, text: string) {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    if (!profile) throw new Error('No profile');
+
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO messages (conversation_id, sender_username, text, is_read, created_at) VALUES (?, ?, ?, ?, ?)',
+      [conversationId, profile.username, text, 0, now]
+    );
+    // Update conversation last_message_at
+    await db.runAsync(
+      'UPDATE conversations SET last_message_at = ? WHERE id = ?',
+      [now, conversationId]
+    );
+  },
+
+  // NOTIFICATIONS
+  async createNotification(type: string, actorUsername: string, targetUsername: string, referenceId?: number) {
+    const db = await getDb();
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT INTO notifications (user_username, actor_username, type, reference_id, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [targetUsername, actorUsername, type, referenceId, 0, now]
+    );
+  },
+
+  // Helper: Notify post author about like
+  async notifyLike(postId: number, likerUsername: string) {
+    const db = await getDb();
+    const post: any = await db.getFirstAsync('SELECT author_username FROM feed_posts WHERE id = ?', [postId]);
+    if (post && post.author_username !== likerUsername) {
+      await this.createNotification('like', likerUsername, post.author_username, postId);
+    }
+  },
+
+  // Helper: Notify post author about comment
+  async notifyComment(postId: number, commenterUsername: string) {
+    const db = await getDb();
+    const post: any = await db.getFirstAsync('SELECT author_username FROM feed_posts WHERE id = ?', [postId]);
+    if (post && post.author_username !== commenterUsername) {
+      await this.createNotification('comment', commenterUsername, post.author_username, postId);
+    }
+  },
+
+  // Helper: Notify user about new follower
+  async notifyFollow(followerUsername: string, followedUsername: string) {
+    if (followerUsername !== followedUsername) {
+      await this.createNotification('follow', followerUsername, followedUsername);
+    }
+  },
+
+  async getUserNotifications() {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    if (!profile) return [];
+    const rows: any[] = await db.getAllAsync(`
+      SELECT n.*, sp.avatar_path as actor_avatar
+      FROM notifications n
+      LEFT JOIN social_profile sp ON n.actor_username = sp.username
+      WHERE n.user_username = ?
+      ORDER BY n.created_at DESC
+      LIMIT 50
+    `, [profile.username]);
+    return rows;
+  },
+
+  async markNotificationRead(notificationId: number) {
+    const db = await getDb();
+    await db.runAsync('UPDATE notifications SET is_read = 1 WHERE id = ?', [notificationId]);
+  },
+
+  async markAllNotificationsRead() {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    if (!profile) return;
+    await db.runAsync('UPDATE notifications SET is_read = 1 WHERE user_username = ?', [profile.username]);
+  },
+
+  // STORIES VIEWS
+  async markStoryViewed(storyId: number) {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    if (!profile) return;
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'INSERT OR IGNORE INTO story_views (story_id, viewer_username, viewed_at) VALUES (?, ?, ?)',
+      [storyId, profile.username, now]
+    );
+  },
+
+  async getStoryViews(storyId: number) {
+    const db = await getDb();
+    const count: any = await db.getFirstAsync(
+      'SELECT COUNT(*) as count FROM story_views WHERE story_id = ?',
+      [storyId]
+    );
+    return count?.count || 0;
+  },
+
+  async getStoriesWithViewStatus() {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    const now = new Date().toISOString();
+
+    // Cleanup expired
+    await db.runAsync('DELETE FROM stories WHERE expires_at < ?', [now]);
+
+    // Fetch stories with view status for current user
+    const myUsername = profile?.username;
+    const rows: any[] = await db.getAllAsync(`
+      SELECT st.*, sp.avatar_path,
+        ${myUsername ? `(SELECT 1 FROM story_views sv WHERE sv.story_id = st.id AND sv.viewer_username = ?) as is_viewed` : '0 as is_viewed'}
+      FROM stories st
+      JOIN social_profile sp ON st.author_username = sp.username
+      ORDER BY st.created_at DESC
+    `, myUsername ? [myUsername] : []);
+
+    return rows;
+  },
+
+  // SOCIAL SETTINGS / CONTENT FILTERS
+  async getSocialSettings() {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    if (!profile) return null;
+
+    // Get additional settings from separate table or use social_profile columns
+    // For now, use social_profile columns if they exist; otherwise defaults
+    const settings: any = {
+      contentStrictness: profile.content_strictness || 1, // 1=Relaxed, 2=Moderate, 3=Strict
+      enableAntiBullying: profile.enable_anti_bullying || 1,
+      privacyWhoCanMessage: profile.privacy_messages || 'everyone', // 'everyone', 'friends'
+      storyVisibility: profile.story_visibility || 'public', // 'public', 'friends', 'close_friends'
+      postDefaultVisibility: profile.post_default_visibility || 'public'
+    };
+
+    // Get muted words
+    const muted: any[] = await db.getAllAsync(
+      'SELECT word FROM muted_words WHERE username = ?',
+      [profile.username]
+    );
+    settings.mutedWords = muted.map(m => m.word);
+
+    // Get blocked users
+    const blocked: any[] = await db.getAllAsync(
+      'SELECT blocked_username FROM blocked_users WHERE blocker_username = ?',
+      [profile.username]
+    );
+    settings.blockedUsers = blocked.map(b => b.blocked_username);
+
+    return settings;
+  },
+
+  async updateSocialSettings(data: {
+    contentStrictness?: number;
+    enableAntiBullying?: boolean;
+    privacyWhoCanMessage?: string;
+    storyVisibility?: string;
+    postDefaultVisibility?: string;
+    mutedWords?: string[];
+    blockedUsers?: string[];
+  }) {
+    const db = await getDb();
+    const profile: any = await this.getMyProfileSettings();
+    if (!profile) throw new Error('No profile');
+
+    // Update social_profile columns if they exist (add via ALTER later)
+    try {
+      await db.runAsync(
+        `UPDATE social_profile SET
+          content_strictness = ?, enable_anti_bullying = ?, privacy_messages = ?,
+          story_visibility = ?, post_default_visibility = ?
+         WHERE username = ?`,
+        [
+          data.contentStrictness ?? (profile.content_strictness || 1),
+          data.enableAntiBullying ? 1 : 0,
+          data.privacyWhoCanMessage ?? (profile.privacy_messages || 'everyone'),
+          data.storyVisibility ?? (profile.story_visibility || 'public'),
+          data.postDefaultVisibility ?? (profile.post_default_visibility || 'public'),
+          profile.username
+        ]
+      );
+    } catch (e) {
+      console.warn('Some columns may not exist yet:', e);
+    }
+
+    // Update muted words (replace all)
+    if (data.mutedWords !== undefined) {
+      await db.runAsync('DELETE FROM muted_words WHERE username = ?', [profile.username]);
+      for (const word of data.mutedWords) {
+        await db.runAsync('INSERT INTO muted_words (username, word, created_at) VALUES (?, ?, datetime("now"))', [profile.username, word]);
+      }
+    }
+
+    // Update blocked users (replace all)
+    if (data.blockedUsers !== undefined) {
+      await db.runAsync('DELETE FROM blocked_users WHERE blocker_username = ?', [profile.username]);
+      for (const blocked of data.blockedUsers) {
+        await db.runAsync('INSERT INTO blocked_users (blocker_username, blocked_username, created_at) VALUES (?, ?, datetime("now"))', [profile.username, blocked]);
+      }
+    }
+  },
+
+  // CONTENT MODERATION HELPERS
+  async isUserBlocked(blockerUsername: string, blockedUsername: string): Promise<boolean> {
+    const db = await getDb();
+    const exists: any = await db.getFirstAsync(
+      'SELECT 1 FROM blocked_users WHERE blocker_username = ? AND blocked_username = ?',
+      [blockerUsername, blockedUsername]
+    );
+    return !!exists;
+  },
+
+  async getMutedWords(username: string): Promise<string[]> {
+    const db = await getDb();
+    const rows: any[] = await db.getAllAsync('SELECT word FROM muted_words WHERE username = ?', [username]);
+    return rows.map(r => r.word);
+  }
 };

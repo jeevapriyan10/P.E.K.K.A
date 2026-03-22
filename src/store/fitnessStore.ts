@@ -23,7 +23,8 @@ interface FitnessState {
   activeWorkoutName: string;
   activeWorkoutStartTime: number | null;
   activeExercises: ActiveExercise[];
-  startWorkout: (name: string) => void;
+  prepareWorkout: (name: string) => void; // sets up workout but does not start timer
+  startWorkoutTimer: () => void; // starts the timer
   addExercise: (exercise: any) => void;
   updateSet: (exId: string, setId: string, field: string, value: any) => void;
   addSet: (exId: string, templateSet?: ActiveSet) => void;
@@ -31,6 +32,9 @@ interface FitnessState {
   markSetDone: (exId: string, setId: string, done: boolean) => void;
   updateExerciseNotes: (exId: string, notes: string) => void;
   endWorkout: () => void;
+  // Rest timer callback: called when a set is completed
+  onSetCompleted: ((exerciseIndex: number, setIndex: number, totalSets: number) => void) | null;
+  setOnSetCompleted: (callback: ((exerciseIndex: number, setIndex: number, totalSets: number) => void) | null) => void;
 }
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -40,14 +44,20 @@ export const useFitnessStore = create<FitnessState>((set) => ({
   activeWorkoutName: '',
   activeWorkoutStartTime: null,
   activeExercises: [],
-  
-  startWorkout: (name) => set({ 
-    isWorkoutActive: true, 
-    activeWorkoutName: name, 
-    activeWorkoutStartTime: Date.now(), 
-    activeExercises: [] 
+  onSetCompleted: null,
+  setOnSetCompleted: (callback) => set({ onSetCompleted: callback }),
+
+  prepareWorkout: (name) => set({
+    isWorkoutActive: true,
+    activeWorkoutName: name,
+    activeWorkoutStartTime: null,
+    activeExercises: []
   }),
-  
+
+  startWorkoutTimer: () => set({
+    activeWorkoutStartTime: Date.now()
+  }),
+
   addExercise: (exercise) => set((state) => ({
     activeExercises: [...state.activeExercises, {
       id: generateId(),
@@ -92,15 +102,25 @@ export const useFitnessStore = create<FitnessState>((set) => ({
     })
   })),
 
-  markSetDone: (exId, setId, done) => set((state) => ({
-    activeExercises: state.activeExercises.map(ex => {
+  markSetDone: (exId, setId, done) => set((state) => {
+    const newExercises = state.activeExercises.map(ex => {
       if (ex.id !== exId) return ex;
       return {
         ...ex,
         sets: ex.sets.map(s => s.id === setId ? { ...s, done } : s)
       };
-    })
-  })),
+    });
+
+    // Trigger callback if set was just completed (done = true)
+    if (done && state.onSetCompleted) {
+      const exerciseIndex = state.activeExercises.findIndex(ex => ex.id === exId);
+      const exercise = state.activeExercises[exerciseIndex];
+      const setIndex = exercise.sets.findIndex(s => s.id === setId);
+      state.onSetCompleted(exerciseIndex, setIndex, exercise.sets.length);
+    }
+
+    return { activeExercises: newExercises };
+  }),
   
   updateExerciseNotes: (exId, notes) => set((state) => ({
     activeExercises: state.activeExercises.map(ex => ex.id === exId ? {...ex, notes} : ex)

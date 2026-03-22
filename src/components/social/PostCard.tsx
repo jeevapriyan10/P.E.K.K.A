@@ -18,6 +18,7 @@ export const PostCard: React.FC<PostCardProps & { onRefresh?: () => void }> = ({
   const [commentText, setCommentText] = useState('');
   const [comments, setComments] = useState<any[]>([]);
   const [commentsCount, setCommentsCount] = useState(post.comments_count || 0);
+  const [isSaved, setIsSaved] = useState(false); // Will check if post is saved on load (optional optimization)
 
   const handleLike = async () => {
     const nextState = !isLiked;
@@ -66,6 +67,17 @@ export const PostCard: React.FC<PostCardProps & { onRefresh?: () => void }> = ({
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const handleSave = async () => {
+    if (isSaved) {
+      await socialDb.unsavePost(post.id);
+      setIsSaved(false);
+    } else {
+      await socialDb.savePost(post.id);
+      setIsSaved(true);
+    }
+    onRefresh?.();
   };
 
   const handleMore = async () => {
@@ -147,8 +159,8 @@ export const PostCard: React.FC<PostCardProps & { onRefresh?: () => void }> = ({
             <MaterialCommunityIcons name="send-outline" size={24} color="#FFF" />
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.actionBtn}>
-          <MaterialCommunityIcons name="bookmark-outline" size={26} color="#FFF" />
+        <TouchableOpacity style={styles.actionBtn} onPress={handleSave}>
+          <MaterialCommunityIcons name={isSaved ? "bookmark" : "bookmark-outline"} size={26} color={isSaved ? Colors.dark.amber : "#FFF"} />
         </TouchableOpacity>
       </View>
 

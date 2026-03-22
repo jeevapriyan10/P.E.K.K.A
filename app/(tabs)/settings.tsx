@@ -7,6 +7,7 @@ import { Colors } from '../../src/constants/colors';
 import { useFocusEffect } from 'expo-router';
 import { notificationService } from '../../src/services/notificationService';
 import { socialDb } from '../../src/db/socialDb';
+import { hybridAI } from '../../src/services/ai/hybrid';
 import * as ImagePicker from 'expo-image-picker';
 import Constants from 'expo-constants';
 
@@ -46,13 +47,14 @@ export default function SettingsScreen() {
     dinnerTime: '19:00',
     workoutTime: '17:30'
   });
+  const [preferOffline, setPreferOffline] = useState(false);
 
   const loadAllData = async () => {
     if (!db || !isReady) return;
     try {
       const user: any = await db.getFirstAsync('SELECT * FROM users ORDER BY id DESC LIMIT 1');
       const social: any = await socialDb.getMyProfileSettings();
-      
+
       if (user) {
         setProfileData(prev => ({
           ...prev,
@@ -76,6 +78,10 @@ export default function SettingsScreen() {
           } : {})
         }));
       }
+
+      // Load AI preference
+      const offlinePref = await hybridAI.getPreferOfflineSetting();
+      setPreferOffline(offlinePref);
     } catch (e) {
       console.warn('Failed to load settings', e);
     }
@@ -248,6 +254,41 @@ export default function SettingsScreen() {
            <ToggleItem label="Share Nutrition" value={profileData.share_nutrition} onToggle={(v: boolean) => setProfileData(p=>({...p, share_nutrition: v}))} icon="food-apple-outline" />
            <ToggleItem label="Share Steps" value={profileData.share_steps} onToggle={(v: boolean) => setProfileData(p=>({...p, share_steps: v}))} icon="shoe-print" />
            <ToggleItem label="Share Achievements" value={profileData.share_achievements} onToggle={(v: boolean) => setProfileData(p=>({...p, share_achievements: v}))} icon="medal-outline" />
+           <View style={styles.divider} />
+           <PickerRow label="Post Default Visibility" value={profileData.post_default_visibility || 'public'} options={['public', 'friends', 'private']} onSelect={(v) => setProfileData(p => ({ ...p, post_default_visibility: v }))} style={{ marginBottom: 12 }} />
+           <PickerRow label="Who Can Message Me" value={profileData.privacy_messages || 'everyone'} options={['everyone', 'friends']} onSelect={(v) => setProfileData(p => ({ ...p, privacy_messages: v }))} />
+           <PickerRow label="Story Visibility" value={profileData.story_visibility || 'public'} options={['public', 'friends', 'close_friends']} onSelect={(v) => setProfileData(p => ({ ...p, story_visibility: v }))} />
+        </View>
+
+        <SectionTitle title="Content Controls" />
+        <View style={styles.card}>
+           <PickerRow label="Content Strictness" value={profileData.content_strictness?.toString() || '1'} options={['1', '2', '3']} onSelect={(v) => setProfileData(p => ({ ...p, content_strictness: parseInt(v) }))} />
+           <Text style={styles.helperText}>1 = Relaxed, 2 = Moderate (requires fitness keywords), 3 = Strict (only fitness posts)</Text>
+
+           <View style={styles.divider} />
+
+           <ToggleItem
+             label="Anti-Bullying Filter"
+             value={!!profileData.enable_anti_bullying}
+             onToggle={(v) => setProfileData(p => ({ ...p, enable_anti_bullying: v ? 1 : 0 }))}
+             icon="shield-check"
+           />
+
+           {/* Muted words and blocked users would require separate management screens - out of scope for now */}
+        </View>
+
+        <SectionTitle title="AI Settings" />
+        <View style={styles.card}>
+          <ToggleItem
+            label="Prefer Offline Mode"
+            value={preferOffline}
+            onToggle={(v) => {
+              setPreferOffline(v);
+              hybridAI.setPreferOffline(v);
+            }}
+            icon="airplane-mode"
+          />
+          <Text style={styles.helperText}>When enabled, AI features (food scanning, content moderation) use only on-device heuristics, saving data and costs.</Text>
         </View>
      </View>
   );
@@ -392,6 +433,7 @@ const styles = StyleSheet.create({
   toggleItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
   toggleLabel: { color: '#FFF', fontSize: 14, fontWeight: '500' },
   divider: { height: 1, backgroundColor: '#222', marginVertical: 10 },
+  helperText: { color: '#777', fontSize: 11, marginTop: 4, marginLeft: 36 },
   nestedInputs: { paddingLeft: 36, gap: 10, marginTop: 10, marginBottom: 16 },
   timeInput: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   timeLabel: { color: '#777', fontSize: 13 },

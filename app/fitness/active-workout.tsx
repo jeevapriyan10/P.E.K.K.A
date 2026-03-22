@@ -16,13 +16,26 @@ import RestTimer from '../../src/components/fitness/RestTimer';
 
 export default function ActiveWorkoutScreen() {
   const router = useRouter();
-  const { activeWorkoutName, activeWorkoutStartTime, activeExercises, startWorkout, endWorkout, addSet, updateSet, markSetDone, updateExerciseNotes, addExercise } = useFitnessStore();
+  const {
+    activeWorkoutName,
+    activeWorkoutStartTime,
+    activeExercises,
+    prepareWorkout,
+    startWorkoutTimer,
+    endWorkout,
+    addSet,
+    updateSet,
+    markSetDone,
+    updateExerciseNotes,
+    addExercise,
+    setOnSetCompleted
+  } = useFitnessStore();
   const { showAchievement } = useAchievements();
   useKeepAwake();
 
   const [timer, setTimer] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const [showTemplates, setShowTemplates] = useState(!activeWorkoutStartTime);
+  const [showTemplates, setShowTemplates] = useState(!activeWorkoutStartTime && activeExercises.length === 0);
   const [restModal, setRestModal] = useState({ visible: false, seconds: 90 });
   const [completeModal, setCompleteModal] = useState(false);
   const [rpe, setRpe] = useState(7);
@@ -37,6 +50,31 @@ export default function ActiveWorkoutScreen() {
     fetchProfile();
   }, []);
 
+  // Set up rest timer callback
+  useEffect(() => {
+    const handleSetCompleted = (exIndex: number, setIndex: number, totalSets: number) => {
+      // Show rest timer if there are more sets in this exercise or more exercises
+      const currentEx = activeExercises[exIndex];
+      if (!currentEx) return;
+
+      const setsDone = currentEx.sets.filter(s => s.done).length;
+      const hasMoreSets = setsDone < currentEx.sets.length;
+      const hasMoreExercises = exIndex < activeExercises.length - 1;
+
+      // Show rest timer if there's more work to do
+      if (hasMoreSets || hasMoreExercises) {
+        setRestModal({ visible: true, seconds: 90 });
+        // Optional: play haptic/audio beep (RestTimer component does it when time's up)
+      }
+    };
+
+    setOnSetCompleted(handleSetCompleted);
+
+    return () => {
+      setOnSetCompleted(null);
+    };
+  }, [activeExercises, setOnSetCompleted]);
+
   useEffect(() => {
     if (!activeWorkoutStartTime || isPaused) return;
     const intv = setInterval(() => {
@@ -50,7 +88,7 @@ export default function ActiveWorkoutScreen() {
   const applyTemplate = async (type: string) => {
     let name = "Custom Workout";
     let exercises: any[] = [];
-    
+
     if (type === 'chest') {
       name = "Chest & Shoulders";
       exercises = await searchExercises('Chest');
@@ -65,10 +103,10 @@ export default function ActiveWorkoutScreen() {
       exercises = exercises.slice(0, 3).concat((await searchExercises('Arms')).slice(0, 2));
     }
 
-    Alert.alert("Start Workout", `Start ${name}?`, [
+    Alert.alert("Prepare Workout", `Prepare ${name}?`, [
       { text: "Cancel", style: "cancel" },
-      { text: "Start Timer", onPress: () => {
-        startWorkout(name);
+      { text: "Next", onPress: () => {
+        prepareWorkout(name);
         exercises.forEach(ex => addExercise(ex));
         setShowTemplates(false);
       }}
@@ -129,7 +167,45 @@ export default function ActiveWorkoutScreen() {
     }
   };
 
-  if (showTemplates) {
+  // If workout prepared but not started → show "Ready to begin" state
+  if (!activeWorkoutStartTime && activeExercises.length > 0) {
+    const estimatedDuration = activeExercises.length * 10; // Rough estimate: 10 min per exercise
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="arrow-left" size={24} color={Colors.dark.text} /></TouchableOpacity>
+          <Text style={styles.headerTitle}>Prepare Workout</Text>
+          <View style={{width: 24}} />
+        </View>
+
+        <View style={styles.readyContainer}>
+          <MaterialCommunityIcons name="dumbbell" size={80} color={Colors.dark.cyan} />
+          <Text style={styles.readyTitle}>Ready to begin?</Text>
+          <Text style={styles.readySub}>{activeExercises.length} exercises • ~{estimatedDuration} min</Text>
+
+          <View style={styles.exercisePreview}>
+            {activeExercises.slice(0, 3).map(ex => (
+              <Text key={ex.id} style={styles.previewItem}>• {ex.name}</Text>
+            ))}
+            {activeExercises.length > 3 && (
+              <Text style={styles.previewItem}>+ {activeExercises.length - 3} more</Text>
+            )}
+          </View>
+
+          <TouchableOpacity style={styles.beginBtn} onPress={startWorkoutTimer}>
+            <Text style={styles.beginBtnTxt}>Begin Workout</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/fitness/workout-planner')}>
+            <Text style={styles.editBtnTxt}>Edit Exercises</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // If no exercises at all, show template selection
+  if (activeExercises.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
@@ -147,7 +223,7 @@ export default function ActiveWorkoutScreen() {
                {id: 'full', label: 'Full Body', icon: 'human'},
                {id: 'custom', label: 'Blank Session', icon: 'plus-circle-outline'}
              ].map(t => (
-               <TouchableOpacity key={t.id} style={styles.templateCard} onPress={() => t.id === 'custom' ? (startWorkout('Custom Workout'), setShowTemplates(false)) : applyTemplate(t.id)}>
+               <TouchableOpacity key={t.id} style={styles.templateCard} onPress={() => t.id === 'custom' ? (prepareWorkout('Custom Workout'), setShowTemplates(false)) : applyTemplate(t.id)}>
                  <MaterialCommunityIcons name={t.icon as any} size={32} color={Colors.dark.cyan} />
                  <Text style={styles.templateLabel}>{t.label}</Text>
                </TouchableOpacity>
@@ -172,21 +248,29 @@ export default function ActiveWorkoutScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.timerBar}>
-        <MaterialCommunityIcons name="clock-outline" size={18} color={Colors.dark.sky} />
-        <Text style={styles.timer}>{msString}</Text>
-        <TouchableOpacity onPress={() => setIsPaused(!isPaused)}>
-          <MaterialCommunityIcons name={isPaused ? "play" : "pause"} size={20} color={Colors.dark.muted} />
-        </TouchableOpacity>
-      </View>
+      {/* Timer bar - only show when workout has started */}
+      {activeWorkoutStartTime && (
+        <View style={styles.timerBar}>
+          <MaterialCommunityIcons name="clock-outline" size={18} color={Colors.dark.sky} />
+          <Text style={styles.timer}>{msString}</Text>
+          <TouchableOpacity onPress={() => setIsPaused(!isPaused)}>
+            <MaterialCommunityIcons name={isPaused ? "play" : "pause"} size={20} color={Colors.dark.muted} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {activeExercises.map((ex) => (
           <View key={ex.id} style={styles.workoutCard}>
             <View style={styles.cardHeader}>
-              <View>
+              <View style={{flex: 1}}>
                 <Text style={styles.exName}>{ex.name}</Text>
-                <Text style={styles.exMuscle}>{ex.muscle_group_primary}</Text>
+                <View style={styles.exMetaRow}>
+                  <Text style={styles.exMuscle}>{ex.muscle_group_primary}</Text>
+                  <Text style={styles.setsProgress}>
+                    {ex.sets.filter(s => s.done).length}/{ex.sets.length} sets
+                  </Text>
+                </View>
               </View>
               <TouchableOpacity><MaterialCommunityIcons name="dots-vertical" size={20} color={Colors.dark.muted}/></TouchableOpacity>
             </View>
@@ -283,15 +367,17 @@ const styles = StyleSheet.create({
   scroll: { padding: 16, gap: 16, paddingBottom: 120 },
   workoutCard: { backgroundColor: Colors.dark.bg2, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: Colors.dark.border },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-  exName: { color: Colors.dark.text, fontSize: 17, fontWeight: 'bold' },
-  exMuscle: { color: Colors.dark.muted, fontSize: 12, marginTop: 2 },
+  exName: { color: Colors.dark.text, fontSize: 18, fontWeight: 'bold' },
+  exMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
+  exMuscle: { color: Colors.dark.muted, fontSize: 12 },
+  setsProgress: { color: Colors.dark.cyan, fontSize: 12, fontWeight: 'bold' },
   rowHeader: { flexDirection: 'row', marginBottom: 8, paddingHorizontal: 8 },
   rhCell: { flex: 1, color: Colors.dark.muted, fontSize: 10, fontWeight: 'bold', textAlign: 'center' },
   setRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderColor: Colors.dark.border2 },
   setRowDone: { opacity: 0.5, backgroundColor: 'rgba(50,200,250,0.05)' },
-  setNum: { color: Colors.dark.muted, width: 40, textAlign: 'center', fontWeight: 'bold' },
-  setInp: { flex: 1, height: 35, color: Colors.dark.text, textAlign: 'center', backgroundColor: Colors.dark.bg3, borderRadius: 8, marginHorizontal: 4 },
-  chkBtn: { width: 40, height: 35, borderRadius: 8, backgroundColor: Colors.dark.bg3, alignItems: 'center', justifyContent: 'center' },
+  setNum: { color: Colors.dark.muted, width: 50, textAlign: 'center', fontWeight: 'bold', fontSize: 16 },
+  setInp: { flex: 1, height: 45, color: Colors.dark.text, textAlign: 'center', backgroundColor: Colors.dark.bg3, borderRadius: 10, marginHorizontal: 4, fontSize: 16 },
+  chkBtn: { width: 50, height: 45, borderRadius: 10, backgroundColor: Colors.dark.bg3, alignItems: 'center', justifyContent: 'center' },
   chkBtnDone: { backgroundColor: Colors.dark.cyan },
   addSet: { padding: 12, marginTop: 12, alignItems: 'center' },
   addSetTxt: { color: Colors.dark.cyan, fontSize: 12, fontWeight: 'bold', letterSpacing: 1 },
@@ -309,5 +395,15 @@ const styles = StyleSheet.create({
   finishFinalBtn: { backgroundColor: Colors.dark.cyan, padding: 18, borderRadius: 16, alignItems: 'center' },
   finishFinalTxt: { color: Colors.dark.bg, fontWeight: 'bold', fontSize: 16 },
   cancelLink: { padding: 12, alignItems: 'center' },
-  cancelLinkTxt: { color: Colors.dark.muted, fontWeight: '600' }
+  cancelLinkTxt: { color: Colors.dark.muted, fontWeight: '600' },
+  // Ready state styles
+  readyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 16 },
+  readyTitle: { color: Colors.dark.text, fontSize: 28, fontWeight: 'bold', textAlign: 'center' },
+  readySub: { color: Colors.dark.muted, fontSize: 16, textAlign: 'center' },
+  exercisePreview: { backgroundColor: Colors.dark.bg2, padding: 20, borderRadius: 16, width: '100%', gap: 8, borderWidth: 1, borderColor: Colors.dark.border },
+  previewItem: { color: Colors.dark.text, fontSize: 15, fontWeight: '500' },
+  beginBtn: { backgroundColor: Colors.dark.cyan, paddingHorizontal: 48, paddingVertical: 18, borderRadius: 16, marginTop: 16 },
+  beginBtnTxt: { color: Colors.dark.bg, fontSize: 18, fontWeight: 'bold' },
+  editBtn: { padding: 12 },
+  editBtnTxt: { color: Colors.dark.muted, fontSize: 14, fontWeight: '600' }
 });

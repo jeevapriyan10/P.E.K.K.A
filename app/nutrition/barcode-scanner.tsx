@@ -73,7 +73,7 @@ export default function BarcodeScannerScreen() {
     <View style={{ flex: 1, backgroundColor: Colors.dark.bg }}>
       <CameraView 
         style={StyleSheet.absoluteFill} 
-        barcodeScannerSettings={{ barcodeTypes: ['ean8','ean13','qr','code128','upce'] }}
+        barcodeScannerSettings={{ barcodeTypes: ['ean8','ean13','qr','code128','upc_e'] }}
         onBarcodeScanned={scanned ? undefined : handleScan}
       />
       <SafeAreaView style={styles.overlay}>

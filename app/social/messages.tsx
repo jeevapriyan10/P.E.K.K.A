@@ -1,20 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Avatar } from '../../src/components/ui/Avatar';
 import { Colors } from '../../src/constants/colors';
+import { useDatabase } from '../../src/providers/DatabaseProvider';
+import { socialDb } from '../../src/db/socialDb';
 
-const MOCK_MESSAGES = [
-  { id: '1', name: 'Jeeva', lastMsg: 'Nice workout yesterday! 🔥', time: '2m', avatar: '🦁', unread: true },
-  { id: '2', name: 'Alex', lastMsg: 'Sent a workout summary', time: '1h', avatar: '🏋️', unread: false },
-  { id: '3', name: 'Sophie', lastMsg: 'Let\'s crushed the group goal!', time: '3h', avatar: '🏃‍♀️', unread: false },
-];
+interface Conversation {
+  id: number;
+  participant1_username: string;
+  participant2_username: string;
+  last_message_at: string;
+  created_at: string;
+  other_display_name: string;
+  other_avatar: string;
+  unread_count: number;
+}
 
 export default function MessagingScreen() {
   const router = useRouter();
+  const { isReady } = useDatabase();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [search, setSearch] = useState('');
+
+  useFocusEffect(useCallback(() => {
+    if (isReady) loadConversations();
+  }, [isReady]));
+
+  const loadConversations = async () => {
+    try {
+      const convs = await socialDb.getConversations();
+      setConversations(convs as Conversation[]);
+    } catch (e) {
+      console.error('Failed to load conversations:', e);
+    }
+  };
+
+  const getTimeAgo = (dateStr: string) => {
+    const now = new Date();
+    const past = new Date(dateStr);
+    const diffMs = now.getTime() - past.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 60) return `${diffMins}m`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h`;
+    return past.toLocaleDateString();
+  };
+
+  const filtered = conversations.filter(c =>
+    c.other_display_name.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -24,15 +61,15 @@ export default function MessagingScreen() {
         </TouchableOpacity>
         <Text style={styles.title}>Messages</Text>
         <TouchableOpacity style={styles.newBtn}>
-          <MaterialCommunityIcons name="square-edit-outline" size={24} color="#FFF" />
+          <MaterialCommunityIcons name="plus" size={24} color="#FFF" />
         </TouchableOpacity>
       </View>
 
       <View style={styles.searchBar}>
         <MaterialCommunityIcons name="magnify" size={20} color="#555" />
-        <TextInput 
-          style={styles.searchInput} 
-          placeholder="Search" 
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search"
           placeholderTextColor="#555"
           value={search}
           onChangeText={setSearch}
@@ -40,23 +77,24 @@ export default function MessagingScreen() {
       </View>
 
       <FlatList
-        data={MOCK_MESSAGES}
-        keyExtractor={item => item.id}
+        data={filtered}
+        keyExtractor={item => item.id.toString()}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.msgItem}>
-            <Avatar source={item.avatar} size={50} />
+          <TouchableOpacity style={styles.msgItem} onPress={() => router.push(`/social/messages/${item.id}`)}>
+            <Avatar source={item.other_avatar} size={50} />
             <View style={styles.msgInfo}>
-              <Text style={styles.msgName}>{item.name}</Text>
-              <Text style={[styles.msgText, item.unread && styles.unreadText]} numberOfLines={1}>
-                {item.lastMsg}
+              <Text style={styles.msgName}>{item.other_display_name}</Text>
+              <Text style={[styles.msgText, item.unread_count > 0 && styles.unreadText]} numberOfLines={1}>
+                {item.last_message || 'No messages yet'}
               </Text>
             </View>
             <View style={styles.msgMeta}>
-              <Text style={styles.msgTime}>{item.time}</Text>
-              {item.unread && <View style={styles.unreadDot} />}
+              <Text style={styles.msgTime}>{getTimeAgo(item.last_message_at)}</Text>
+              {item.unread_count > 0 && <View style={styles.unreadDot} />}
             </View>
           </TouchableOpacity>
         )}
+        ListEmptyComponent={<Text style={styles.empty}>No conversations yet. Start by posting or commenting!</Text>}
       />
     </SafeAreaView>
   );
@@ -77,5 +115,6 @@ const styles = StyleSheet.create({
   unreadText: { color: '#FFF', fontWeight: 'bold' },
   msgMeta: { alignItems: 'flex-end', marginLeft: 10 },
   msgTime: { color: '#555', fontSize: 12 },
-  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.dark.cyan, marginTop: 8 }
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.dark.cyan, marginTop: 8 },
+  empty: { color: Colors.dark.muted, textAlign: 'center', marginTop: 40 }
 });

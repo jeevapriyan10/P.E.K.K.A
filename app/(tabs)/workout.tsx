@@ -6,7 +6,6 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../../src/constants/colors';
 import { useFitnessStore } from '../../src/store/fitnessStore';
-import StepTracker from '../../src/components/fitness/StepTracker';
 import { getWorkoutHistory, seedExercises } from '../../src/db/fitnessDb';
 import { getDb } from '../../src/lib/database';
 
@@ -55,21 +54,19 @@ export default function WorkoutDashboard() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        <StepTracker />
-
         <View style={styles.grid}>
-          <TouchableOpacity style={[styles.card, { backgroundColor: Colors.dark.cyan }]} onPress={() => router.push('/fitness/active-workout')}>
+          <TouchableOpacity style={[styles.card, { backgroundColor: Colors.dark.cyan }]} onPress={() => router.push('/fitness/workout-planner')}>
             <MaterialCommunityIcons name="play-circle" size={32} color={Colors.dark.bg} />
             <View>
               <Text style={[styles.cardTitle, { color: Colors.dark.bg }]}>Start Workout</Text>
-              <Text style={[styles.cardSub, { color: Colors.dark.bg, opacity: 0.8 }]}>Begin a new session</Text>
+              <Text style={[styles.cardSub, { color: Colors.dark.bg, opacity: 0.8 }]}>Choose exercises & go</Text>
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.card} onPress={() => router.push('/fitness/workout-planner')}>
+          <TouchableOpacity style={styles.card} onPress={() => router.push('/fitness/workout-planner?view=history')}>
             <MaterialCommunityIcons name="calendar-clock" size={28} color={Colors.dark.lime} />
             <Text style={styles.cardTitle}>Planner</Text>
-            <Text style={styles.cardSub}>7-day split</Text>
+            <Text style={styles.cardSub}>Plan your week</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.card} onPress={() => router.push('/fitness/cardio-log')}>
@@ -103,8 +100,11 @@ export default function WorkoutDashboard() {
                   <Text style={styles.histDate}>{h.date}</Text>
                 </View>
                 <View style={{alignItems: 'flex-end'}}>
-                  <Text style={[styles.histVol, h.category === 'cardio' && { color: Colors.dark.sky }]}>{Math.round(h.total_volume)} {h.category === 'cardio' ? 'kcal' : 'kg'}</Text>
-                  <Text style={styles.histTime}>{h.duration_minutes} min</Text>
+                  {/* Volume removed per design */}
+                  <Text style={[styles.histVol, h.category === 'cardio' && { color: Colors.dark.sky }]}>
+                    {h.category === 'cardio' ? `${Math.round(h.total_volume)} kcal` : `${h.duration_minutes} min`}
+                  </Text>
+                  {h.category !== 'cardio' && <Text style={styles.histTime}>{h.duration_minutes} min</Text>}
                 </View>
               </TouchableOpacity>
             ))

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DatabaseProvider } from '../src/providers/DatabaseProvider';
+import { StepTrackingProvider } from '../src/providers/StepTrackingProvider';
 import { AchievementProvider } from '../src/providers/AchievementProvider';
 import { StorageKeys } from '../src/constants/storageKeys';
 import LoadingState from '../src/components/ui/LoadingState';
@@ -50,12 +51,14 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <DatabaseProvider>
-        <AchievementProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="onboarding" />
-            <Stack.Screen name="(tabs)" />
-          </Stack>
-        </AchievementProvider>
+        <StepTrackingProvider>
+          <AchievementProvider>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="onboarding" />
+              <Stack.Screen name="(tabs)" />
+            </Stack>
+          </AchievementProvider>
+        </StepTrackingProvider>
       </DatabaseProvider>
     </ErrorBoundary>
   );

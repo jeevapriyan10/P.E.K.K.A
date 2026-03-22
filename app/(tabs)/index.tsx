@@ -13,6 +13,7 @@ import StreakHeatmap from '../../src/components/dashboard/StreakHeatmap';
 import AISummaryCard from '../../src/components/ai/AISummaryCard';
 import AnomalyBanner from '../../src/components/ai/AnomalyBanner';
 import { Avatar } from '../../src/components/ui/Avatar';
+import StepTracker from '../../src/components/fitness/StepTracker';
 import { socialDb } from '../../src/db/socialDb';
 import { calculateTDEE } from '../../src/utils/tdeeCalculator';
 
@@ -189,6 +190,9 @@ export default function Dashboard() {
             protein: goals.protein
           }}
         />
+
+        {/* Step Tracker */}
+        <StepTracker />
 
         {/* Heatmap */}
         <StreakHeatmap data={heatmapData} title="Activity Consistency (Last 28 Days)" />

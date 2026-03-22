@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../src/constants/colors';
-import { analyzeFoodImage } from '../../src/services/geminiService';
+import { analyzeFoodImage } from '../../src/services/ai/hybrid';
 
 export default function FoodCameraScreen() {
   const router = useRouter();

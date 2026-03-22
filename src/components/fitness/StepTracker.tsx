@@ -1,51 +1,14 @@
 // filepath: src/components/fitness/StepTracker.tsx
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Pedometer } from 'expo-sensors';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../constants/colors';
 import RingProgress from '../ui/RingProgress';
-import { saveDailySteps } from '../../db/fitnessDb';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useStepTracking } from '../../providers/StepTrackingProvider';
 
 export default function StepTracker() {
-  const [steps, setSteps] = useState(0);
+  const { steps, isAvailable } = useStepTracking();
   const [goal] = useState(10000);
-  const [isAvailable, setIsAvailable] = useState(false);
-
-  useEffect(() => {
-    let sub: Pedometer.Subscription | null = null;
-
-    const init = async () => {
-      const avail = await Pedometer.isAvailableAsync();
-      setIsAvailable(avail);
-      
-      if (avail) {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const stored = await AsyncStorage.getItem(`step_total_${todayStr}`);
-        const initialSteps = parseInt(stored || '0', 10);
-        setSteps(initialSteps);
-
-        sub = Pedometer.watchStepCount(async result => {
-          setSteps(prev => {
-              const newTotal = initialSteps + result.steps;
-              if (newTotal % 10 === 0) {
-                 AsyncStorage.setItem(`step_total_${todayStr}`, newTotal.toString());
-                 const distance = newTotal * 0.00076;
-                 const cals = newTotal * 0.04;
-                 saveDailySteps(todayStr, newTotal, distance, cals);
-              }
-              return newTotal;
-          });
-        });
-      }
-    };
-    init();
-
-    return () => {
-      sub?.remove();
-    };
-  }, []);
 
   const distance = (steps * 0.00076).toFixed(2);
   const cals = Math.round(steps * 0.04);
